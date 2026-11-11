@@ -1,0 +1,3 @@
+iso-countries.json contains ISO 3166-1 alpha-2/alpha-3 codes generated from pycountry 24.6.1, which incorporates data from the Debian iso-codes project.
+Source: https://github.com/pycountry/pycountry
+License: LGPL-2.1-only. See ISO_COUNTRIES_LICENSE.txt.

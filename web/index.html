@@ -1,0 +1,2825 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>模擬国連 議事録</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --danger-light: #fef2f2;
+      --success: #16a34a;
+      --success-hover: #15803d;
+      --success-light: #f0fdf4;
+      --warning: #d97706;
+      --warning-light: #fffbeb;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --border-dark: #cbd5e1;
+      --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --card-hover-shadow: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -1px rgba(0,0,0,0.04);
+      --transcribed-bg: #f1f5f9;
+      --transcribed-text: #64748b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-size: 13px;
+    }
+
+    /* 1. スリムヘッダー */
+    .top-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      height: 40px;
+      padding: 0 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .header-left { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; overflow: hidden; }
+    .brand-title {
+      font-weight: 700;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .status-pill {
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      background: #e2e8f0;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+      font-weight: 500;
+    }
+    .status-pill.active { background: #dcfce7; color: #15803d; font-weight: 600; }
+    .status-pill.recording { background: #fee2e2; color: #b91c1c; font-weight: 600; }
+    .status-pill.sharing { background: #e0e7ff; color: #4338ca; font-weight: 600; }
+    .status-pill.guest { background: #fef3c7; color: #b45309; font-weight: 600; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .header-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .icon-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 0.73rem;
+      cursor: pointer;
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    .icon-btn:hover { background: #f1f5f9; border-color: var(--border-dark); }
+    .icon-btn.primary { background: var(--primary-light); color: var(--primary); border-color: #bfdbfe; }
+    .icon-btn.primary:hover { background: #dbeafe; }
+
+    /* 2. 操作ツールバー (Docs左右半画面幅でもコンパクトに収まる設計) */
+    .control-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .control-group-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .control-group-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+    .btn-main {
+      padding: 5px 11px;
+      border-radius: 5px;
+      border: 1px solid transparent;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-record-standby {
+      background: var(--danger-light);
+      color: var(--danger);
+      border-color: #fecaca;
+    }
+    .btn-record-standby:hover { background: #fee2e2; }
+    .btn-record-standby.active {
+      background: var(--danger);
+      color: #ffffff;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.75; }
+      100% { opacity: 1; }
+    }
+
+    .btn-cue-mark {
+      background: var(--primary-light);
+      color: var(--primary);
+      border-color: #bfdbfe;
+      user-select: none;
+    }
+    .btn-cue-mark:hover { background: #dbeafe; }
+    .btn-cue-mark:active, .btn-cue-mark.active {
+      background: var(--primary);
+      color: #ffffff;
+      transform: scale(0.98);
+    }
+
+    .margin-setting {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      background: #f1f5f9;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .margin-input {
+      width: 38px;
+      padding: 1px 3px;
+      font-size: 0.72rem;
+      border: 1px solid var(--border-dark);
+      border-radius: 3px;
+      text-align: center;
+    }
+
+    /* 3. エディタサブバー */
+    .editor-subbar {
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      padding: 5px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .subbar-left { display: flex; align-items: center; gap: 6px; }
+    .subbar-right { display: flex; align-items: center; gap: 5px; }
+
+    .mini-btn {
+      padding: 3px 8px;
+      font-size: 0.72rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .mini-btn:hover { background: #f1f5f9; border-color: var(--border-dark); }
+    .mini-btn-primary { background: var(--primary); color: #ffffff; border-color: var(--primary); }
+    .mini-btn-primary:hover { background: var(--primary-hover); }
+    .mini-btn-success { background: var(--success); color: #ffffff; border-color: var(--success); }
+    .mini-btn-success:hover { background: var(--success-hover); }
+    .mini-btn-danger { background: var(--surface); color: var(--danger); border-color: #fecaca; }
+    .mini-btn-danger:hover { background: var(--danger-light); }
+
+    /* 4. メイン領域 (発言ブロック最優先) */
+    .main-workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+      position: relative;
+    }
+
+    .blocks-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* 発言ブロックカード */
+    .speech-block-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 8px 10px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+    .speech-block-card:hover {
+      border-color: #cbd5e1;
+      box-shadow: var(--card-hover-shadow);
+    }
+    .speech-block-card.transcribed {
+      background: var(--transcribed-bg);
+      border-color: #cbd5e1;
+      opacity: 0.85;
+    }
+    .speech-block-card.transcribed .block-content-text {
+      color: var(--transcribed-text);
+      text-decoration: line-through decoration-slate-400;
+    }
+
+    .block-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 4px;
+    }
+    .block-header-left { display: flex; align-items: center; gap: 6px; }
+    .block-tag {
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.68rem;
+    }
+    .block-time { color: var(--text-muted); font-family: monospace; font-size: 0.68rem; }
+    
+    .block-header-right { display: flex; align-items: center; gap: 4px; }
+    
+    .transcribe-check-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      font-size: 0.72rem;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      user-select: none;
+    }
+    .transcribe-check-label:hover { background: #f1f5f9; }
+    .transcribe-check-label input { cursor: pointer; }
+
+    .block-btn {
+      padding: 2px 6px;
+      font-size: 0.68rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      transition: all 0.15s ease;
+    }
+    .block-btn:hover { background: #f1f5f9; border-color: var(--border-dark); }
+    .block-btn.copy:active { background: #dcfce7; color: #15803d; }
+
+    /* 本文エディタ (インライン直接編集・選択コピー対応) */
+    .block-content-text {
+      font-size: 0.88rem;
+      line-height: 1.6;
+      color: var(--text);
+      outline: none;
+      min-height: 24px;
+      word-break: break-word;
+      white-space: pre-wrap;
+      cursor: text;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: background 0.15s ease;
+    }
+    .block-content-text:focus {
+      background: #f8fafc;
+      box-shadow: inset 0 0 0 1px var(--primary);
+    }
+
+    /* 空状態メッセージ */
+    .empty-blocks-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      gap: 12px;
+      user-select: none;
+    }
+    .empty-icon { font-size: 2.2rem; }
+    .empty-title { font-weight: 600; font-size: 0.95rem; color: var(--text); }
+    .empty-steps {
+      max-width: 460px;
+      text-align: left;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+    }
+
+    /* フローティング通知トースト (ボタンを押し下げない絶対固定) */
+    .toast-container {
+      position: fixed;
+      top: 12px;
+      right: 16px;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast-card {
+      pointer-events: auto;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 380px;
+      animation: toastIn 0.2s ease-out;
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .toast-close {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .toast-close:hover { color: #ffffff; }
+
+    /* モーダルオーバーレイ */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(2px);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-card {
+      background: var(--surface);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .modal-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      background: #f8fafc;
+    }
+    .modal-body { padding: 14px; overflow-y: auto; font-size: 0.78rem; }
+    .modal-footer {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      background: #f8fafc;
+    }
+
+    /* 2台目接続コード画面カード (ゲスト参加時) */
+    .join-guest-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 420px;
+      margin: 40px auto;
+      box-shadow: var(--card-hover-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* レスポンシブ (Google Docs左右半画面 600〜800px 最適化) */
+    @media (max-width: 760px) {
+      .brand-title { font-size: 0.8rem; }
+      .btn-main { padding: 4px 8px; font-size: 0.74rem; }
+      .mini-btn { padding: 2px 6px; font-size: 0.7rem; }
+      .margin-setting { display: none; }
+      .top-header { padding: 0 8px; }
+      .control-bar { padding: 4px 8px; }
+      .blocks-container { padding: 6px 8px; }
+    }
+    /* 会議中の操作を中心にした、落ち着いた青の画面 */
+    :root {
+      --primary: #2456b8;
+      --primary-hover: #194794;
+      --primary-light: #edf3ff;
+      --bg: #f3f6fa;
+      --surface: #ffffff;
+      --text: #172a46;
+      --text-muted: #526580;
+      --border: #dce4ef;
+      --border-dark: #b9c8da;
+      --transcribed-bg: #f4f7fb;
+      --transcribed-text: #596d87;
+      --card-shadow: none;
+      --card-hover-shadow: none;
+    }
+    body { font-size: 14px; line-height: 1.5; }
+    button, input, select, textarea { font: inherit; }
+    button:focus-visible, input:focus-visible, select:focus-visible,
+    [contenteditable]:focus-visible { outline: 3px solid #80aaff; outline-offset: 2px; }
+    ::selection { background: #c9dcff; color: #142b50; }
+    .top-header { min-height: 54px; height: auto; padding: 9px 18px; box-shadow: none; gap: 12px; }
+    .header-left { gap: 10px; min-width: 0; }
+    .brand-title { font-size: 15px; letter-spacing: .01em; color: #183d76; }
+    .status-pill { padding: 3px 8px; font-size: 11px; background: #eef2f7; color: #435b7a; }
+    .status-pill.active, .status-pill.sharing { background: #eaf1ff; color: #2456a8; }
+    .status-pill.guest { background: #eaf1ff; color: #2456a8; }
+    .header-right { gap: 4px; }
+    .icon-btn { border-color: transparent; background: transparent; border-radius: 7px; padding: 6px 9px; font-size: 12px; color: #435b7a; }
+    .icon-btn:hover { background: #edf3ff; border-color: transparent; color: #194794; }
+    .icon-btn.primary { background: #edf3ff; border-color: transparent; color: #2456b8; }
+    .control-bar { padding: 11px 18px; gap: 10px; }
+    .control-group-left { min-width: 0; gap: 8px; }
+    .btn-main { min-height: 38px; border-radius: 7px; padding: 7px 13px; font-size: 13px; }
+    .btn-record-standby { background: #2456b8; border-color: #2456b8; color: #fff; }
+    .btn-record-standby:hover { background: #194794; }
+    .btn-record-standby.active { background: #a72f42; border-color: #a72f42; color: #fff; animation: none; }
+    .btn-cue-mark { background: #fff; border-color: #b9c8da; color: #254a7d; }
+    .btn-cue-mark:hover { background: #edf3ff; }
+    .margin-setting { background: transparent; border: 0; color: #526580; }
+    .editor-subbar { min-height: 50px; padding: 8px 18px; background: #f3f6fa; flex-wrap: wrap; }
+    .subbar-left, .subbar-right { flex-wrap: wrap; }
+    .mini-btn { min-height: 32px; padding: 5px 9px; border-radius: 6px; font-size: 12px; }
+    .mini-btn-primary { background: #fff; color: #2456b8; border-color: #b9c8da; }
+    .mini-btn-primary:hover { background: #edf3ff; color: #194794; }
+    .mini-btn-danger { color: #526580; border-color: var(--border); }
+    .blocks-container { padding: 14px 18px 32px; gap: 10px; }
+    .speech-block-card { border-radius: 10px; padding: 13px 15px; gap: 9px; }
+    .speech-block-card:hover { border-color: #aebfd4; }
+    .speech-block-card.transcribed { opacity: 1; }
+    .block-header { padding-bottom: 8px; border-color: #edf1f6; flex-wrap: wrap; }
+    .block-header-left, .block-header-right { flex-wrap: wrap; }
+    .block-tag { background: #edf3ff; color: #2456a8; padding: 3px 7px; font-size: 11px; }
+    .block-btn { min-height: 29px; padding: 4px 8px; border-radius: 5px; font-size: 12px; }
+    .block-content-text { font-size: 15px; line-height: 1.85; padding: 5px 3px; }
+    .empty-blocks-placeholder { min-height: 50%; padding: 32px 18px; gap: 10px; }
+    .empty-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: #2456b8; background: #e7efff; font-size: 22px; }
+    .empty-title { font-size: 15px; color: #213b60; }
+    .empty-steps { max-width: 380px; border: 0; background: transparent; padding: 0; text-align: center; font-size: 13px; line-height: 1.8; color: #526580; }
+    .modal-card, .join-guest-card { border-radius: 12px; }
+    .modal-overlay { backdrop-filter: none; }
+    .modal-header { padding: 15px 18px; background: #fff; font-size: 15px; }
+    .modal-body { padding: 18px; font-size: 13px; }
+    .modal-footer { padding: 12px 18px; background: #fff; }
+    #settings-modal .modal-body > div { background: #fff !important; border: 0 !important; border-radius: 0 !important; border-bottom: 1px solid #e6edf5 !important; padding: 4px 0 16px !important; }
+    #settings-modal select { min-width: 0; min-height: 34px; padding: 5px 8px !important; color: #172a46; background: #fff; }
+    .toast-container { top: auto; right: 16px; bottom: 16px; }
+    @media (max-width: 760px) {
+      .top-header { padding: 8px 12px; flex-wrap: wrap; }
+      .control-bar { padding: 9px 12px; }
+      .editor-subbar { padding: 8px 12px; }
+      .blocks-container { padding: 12px 12px 28px; }
+      .header-right { margin-left: auto; }
+      .brand-title { font-size: 14px; }
+      .btn-main { font-size: 12px; }
+    }
+    @media (max-width: 480px) {
+      .top-header { gap: 5px 8px; }
+      .control-bar { flex-wrap: wrap; }
+      .editor-subbar { align-items: flex-start; }
+      .block-header-right { justify-content: flex-start; }
+    }
+    /* 文章の区切りとコピーを同じ行に置く */
+    .blocks-container { gap: 0; background: #fff; padding-top: 8px; }
+    .speech-block-card, .speech-block-card:hover {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
+      gap: 12px; border: 0; border-bottom: 1px solid #e8eef6; border-radius: 0;
+      padding: 14px 4px; box-shadow: none; background: #fff;
+    }
+    .block-header { display: contents; }
+    .block-header-left { display: none; }
+    .block-header-right { grid-column: 2; grid-row: 1; }
+    .block-content-text { grid-column: 1; grid-row: 1; min-height: 36px; }
+    .block-audio { grid-column:1 / -1; width:min(100%, 360px); height:36px; }
+    .block-delete-audio { grid-column:1 / -1; justify-self:start; }
+    .block-content-text:empty::before { content: "文字化中…"; color: #8796aa; }
+    .speech-block-card[data-status="recording"] .block-content-text:empty::before { content: "録音中…"; }
+    .transcribe-check-label { background: transparent; border: 0; min-height: 40px; padding: 6px 10px; font-size: 13px; }
+    .transcribe-check-label input { width: 18px; height: 18px; }
+    .block-btn.copy { min-height: 40px; min-width: 68px; justify-content: center; font-size: 13px; }
+    .import-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto; font: inherit; }
+    .setup-field textarea { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #b9c8da; border-radius: 5px; font: inherit; }
+    .setup-section { display: grid; gap: 9px; padding-bottom: 17px; border-bottom: 1px solid #e6edf5; }
+    .setup-title, .setup-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .setup-checks { display: flex; gap: 6px; flex-wrap: wrap; }
+    .setup-check { padding: 4px 8px; border-radius: 5px; background: #f0f4f9; color: #435b7a; font-size: 12px; }
+    .setup-check.missing { background: #fff4e5; color: #805218; }
+    .setup-field { display: grid; gap: 5px; color: #435b7a; font-size: 12px; }
+    .setup-field input, .setup-field select { width: 100%; min-width: 0; min-height: 34px; padding: 6px 8px; border: 1px solid #b9c8da; border-radius: 5px; background: #fff; color: #172a46; }
+    .setup-field input:disabled, .setup-field select:disabled { background:#f0f4f9; color:#65758a; }
+    .setup-note { margin: 0; color: #526580; font-size: 12px; line-height: 1.6; }
+    .setup-actions { justify-content: flex-start; font-size: 12px; color: #526580; }
+    .setup-section > button { justify-self: start; }
+    .cell-state { color:#526580; font-size:11px; white-space:nowrap; }
+    .input-meter { display:flex; align-items:center; gap:6px; color:#526580; font-size:12px; }
+    .input-meter meter { width:68px; height:12px; accent-color:#2456b8; }
+    .audio-options { display:flex; flex-wrap:wrap; gap:8px 16px; }
+    [hidden] { display:none !important; }
+    .document-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:9px 0; border-bottom:1px solid #e6edf5; }
+    .term-row { display:grid; grid-template-columns:auto minmax(0,1fr) minmax(0,1fr); gap:6px; align-items:center; margin:6px 0; }
+    .term-row input:not([type=checkbox]) { min-width:0; width:100%; padding:6px; border:1px solid #b9c8da; border-radius:5px; }
+    .document-list { max-height:190px; overflow:auto; }
+    .country-options { display:grid; gap:4px; max-height:180px; overflow:auto; margin:8px 0; }
+    .country-options label { display:flex; gap:7px; align-items:center; padding:3px 0; }
+    .candidate-compare { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .candidate-text { white-space:pre-wrap; overflow-wrap:anywhere; padding:12px; border:1px solid #dce4ef; border-radius:6px; line-height:1.8; max-height:45vh; overflow:auto; }
+    @media (max-width:600px) { .candidate-compare { grid-template-columns:1fr; } .candidate-text { max-height:22vh; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+  </style>
+</head>
+<body>
+
+  <!-- フローティング通知トーストコンテナ (ボタンずれ防止) -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- 1. スリムヘッダー -->
+  <header class="top-header">
+    <div class="header-left">
+      <span class="brand-title">模擬国連 議事録</span>
+      <span id="badge-rec-status" class="status-pill"><span class="dot"></span> マイクオフ</span>
+      <span id="badge-process-status" class="status-pill"><span class="dot"></span> アイドル</span>
+      <span id="badge-share-status" class="status-pill" style="display:none;"><span class="dot"></span> 共有中</span>
+    </div>
+    <div class="header-right">
+      <button id="btn-open-share" class="icon-btn primary" onclick="openShareModal()" title="2台目のPC・スマホと同一Wi-Fiで文章・転記状態をリアルタイム共有します">
+        共有
+      </button>
+      <button class="icon-btn" onclick="openHelpModal()">使い方</button>
+      <button id="btn-documents" class="icon-btn" onclick="openDocumentsModal()">会議情報</button>
+      <button id="btn-settings" class="icon-btn" onclick="openSettingsModal()">設定</button>
+      <button class="icon-btn" onclick="openHistoryModal()" title="保存済みの記録">履歴</button>
+      <button id="btn-shutdown" class="icon-btn" onclick="shutdownApp()">終了</button>
+    </div>
+  </header>
+
+  <!-- 2. 操作ツールバー (ホストMac録音 / 2台目ゲスト同期表示) -->
+  <div class="control-bar">
+    <div class="control-group-left">
+      <!-- ホストMac用: 録音スタンバイトグル -->
+      <button id="btn-rec-standby" class="btn-main btn-record-standby" onclick="toggleRecordingStandby()">
+        <span id="rec-icon">●</span> <span id="rec-label">マイクをオン</span>
+      </button>
+
+      <!-- ホストMac用: 発言マーク -->
+      <button
+        id="btn-cue-mark"
+        class="btn-main btn-cue-mark"
+        onpointerdown="cueButtonDown(event)"
+        onpointerup="cueButtonUp(event)"
+        onpointercancel="cueButtonUp(event)"
+        title="F2で文字化を開始・終了します"
+      >
+        文字化 <span id="cue-key-name">F2</span> <span id="cue-mode-label">切替</span>
+      </button>
+
+      <!-- 2台目ゲスト端末用: マイク不要同期バッジ -->
+      <div id="guest-indicator" style="display:none;" class="status-pill guest">
+        📡 2台目同期モード (閲覧・編集同期 / 遠隔マイク不要)
+      </div>
+
+      <!-- 前後マージン (ホストのみ) -->
+      <div id="box-margin-setting" class="margin-setting">
+        <span>前後</span>
+        <input type="number" id="input-margin-sec" class="margin-input" value="2.0" step="0.5" min="0" max="8">
+        <span>秒</span>
+      </div>
+    </div>
+
+    <div class="control-group-right">
+      <label class="input-meter" for="input-level">入力 <meter id="input-level" min="0" max="1" value="0">0</meter></label>
+      <span id="timer-display" style="font-size:0.75rem; color:var(--text-muted); font-family:monospace;">00:00</span>
+      <span id="cue-indicator" style="font-size:0.72rem; color:var(--danger); display:none; font-weight:700;">● マーク中…</span>
+    </div>
+  </div>
+
+  <!-- 3. エディタサブバー (発言ブロックの一括操作) -->
+  <div class="editor-subbar">
+    <div class="subbar-left">
+      <span style="font-weight:700; font-size:0.9rem; color:var(--text);">発言</span>
+      <span id="block-count-badge" class="status-pill">0 件</span>
+      <span id="sync-status-indicator" style="font-size:0.7rem; color:var(--text-muted);">● 同期中</span>
+    </div>
+
+    <div class="subbar-right">
+      <button class="mini-btn mini-btn-primary" onclick="copyAllBlocksToClipboard()" title="すべての発言テキストをクリップボードにコピーします (⌘C)">
+        全文をコピー
+      </button>
+      <button class="mini-btn" onclick="toggleAllTranscribed()" title="すべての発言ブロックの転記済みチェックを一括トグルします">
+        すべて転記済み
+      </button>
+      <button class="mini-btn mini-btn-danger" onclick="clearBlocksView()" title="画面上の表示をクリアします（サーバー保存履歴・議事録ファイルは完全に保護されます）">
+        表示をクリア
+      </button>
+      <button id="btn-restore-blocks" class="mini-btn" style="display:none;" onclick="restoreBlocksView()" title="非表示にした発言ブロックを履歴から復元します">
+        ↩️ 復元
+      </button>
+    </div>
+  </div>
+
+  <!-- 4. メイン領域 (発言ブロック最優先) -->
+  <main class="main-workspace">
+    <!-- ゲスト未認証時: 接続コード入力カード -->
+    <div id="guest-join-screen" style="display:none; width:100%; height:100%; overflow-y:auto;">
+      <div class="join-guest-card">
+        <div style="font-weight:700; font-size:1.1rem; display:flex; align-items:center; gap:8px;">
+          共有に参加
+        </div>
+        <div style="font-size:0.78rem; color:var(--text-muted); line-height:1.5;">
+          録音担当の画面に表示された接続コードを入力してください。
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <label style="font-weight:600; font-size:0.75rem;">接続コード:</label>
+          <input
+            type="text"
+            id="input-guest-code"
+            placeholder="例: MUN-ABCD-EFGH"
+            style="font-size:1.1rem; font-weight:700; font-family:monospace; padding:8px 12px; border:2px solid var(--primary); border-radius:6px; text-transform:uppercase; text-align:center; letter-spacing:2px;"
+          >
+        </div>
+        <button class="btn-main mini-btn-primary" style="justify-content:center; padding:10px;" onclick="submitGuestJoin()">
+          参加する
+        </button>
+        <div style="background:#fffbeb; border:1px solid #fef3c7; border-radius:6px; padding:8px 10px; font-size:0.7rem; color:#b45309; line-height:1.4;">
+          ⚠️ <strong>ローカルLAN通信です:</strong> 接続コードは認証用であり、同一Wi-Fi内の平文HTTP通信です。信頼できるLAN内でのみご利用ください。
+        </div>
+      </div>
+    </div>
+
+    <!-- 通常・認証後: 発言ブロックリスト -->
+    <div id="blocks-view" class="blocks-container">
+      <div id="empty-placeholder" class="empty-blocks-placeholder">
+        <div class="empty-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 10v4m4-7v10m4-13v16m4-13v10m4-7v4"/></svg></div>
+        <div class="empty-title">発言がここに表示されます</div>
+        <div class="empty-steps">マイクをオンにし、文字にしたい発言の間<br><strong>F2キーで開始・終了</strong>してください。</div>
+      </div>
+      <!-- 動的ブロックカードがここに挿入されます -->
+    </div>
+  </main>
+
+  <!-- 2台目共有モーダル -->
+  <div id="share-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>2台目と共有</span>
+        <button style="background:none; border:none; cursor:pointer;" onclick="closeShareModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
+        <!-- トグルスイッチ -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:10px;">
+          <div>
+            <div style="font-weight:700; font-size:0.85rem;">2台目共有モード</div>
+            <div style="font-size:0.7rem; color:var(--text-muted);">同じネットワークの端末と共有します</div>
+          </div>
+          <button id="btn-toggle-share" class="btn-main mini-btn-primary" onclick="toggleShareState()">
+            共有を開始
+          </button>
+        </div>
+
+        <!-- 共有中情報 (共有ON時のみ表示) -->
+        <div id="share-active-info" style="display:none; flex-direction:column; gap:10px;">
+          <!-- 接続コード -->
+          <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:12px; text-align:center;">
+            <div style="font-size:0.75rem; color:#1e40af; font-weight:600; margin-bottom:4px;">2台目で入力する接続コード</div>
+            <div id="share-code-display" style="font-size:1.8rem; font-weight:800; font-family:monospace; color:#1d4ed8; letter-spacing:3px;">
+              MUN-0000
+            </div>
+          </div>
+
+          <!-- 2台目アクセスURL -->
+          <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:10px;">
+            <div style="font-weight:600; font-size:0.75rem; margin-bottom:4px;">2台目ブラウザで開くURL:</div>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="share-url-input" readonly style="flex:1; padding:4px 8px; font-size:0.75rem; font-family:monospace; border:1px solid var(--border-dark); border-radius:4px; background:#ffffff;">
+              <button class="mini-btn mini-btn-primary" onclick="copyShareUrl()">📋 URLコピー</button>
+            </div>
+            <div id="share-ip-list" style="font-size:0.68rem; color:var(--text-muted); margin-top:4px;">
+              候補IP: 読み込み中...
+            </div>
+          </div>
+
+          <!-- 権限設定 -->
+          <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:10px;">
+            <div style="font-weight:600; font-size:0.75rem; margin-bottom:6px;">2台目のアクセス権限:</div>
+            <div style="display:flex; gap:12px;">
+              <label style="display:flex; align-items:center; gap:4px; font-size:0.75rem; cursor:pointer;">
+                <input type="radio" name="share_role" value="editor" checked onchange="changeShareRole('editor')">
+                <span>編集可 (分割・結合・テキスト編集・転記チェック)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:4px; font-size:0.75rem; cursor:pointer;">
+                <input type="radio" name="share_role" value="viewer" onchange="changeShareRole('viewer')">
+                <span>閲覧専用 (範囲選択コピーのみ)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 接続数 -->
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-muted);">
+            <span>接続中の2台目端末: <strong id="share-guest-count" style="color:var(--text);">0</strong> 台</span>
+            <button class="mini-btn mini-btn-danger" onclick="terminateAllSharing()" title="すべての2台目接続を即座に強制切断します">
+              🛑 共有を終了・全切断
+            </button>
+          </div>
+        </div>
+
+        <!-- セキュリティ警告 (平文暗号化リスクの明記) -->
+        <div style="background:#fffbeb; border:1px solid #fef3c7; border-radius:6px; padding:10px; font-size:0.7rem; color:#b45309; line-height:1.45;">
+          <strong>⚠️ LAN通信セキュリティに関する注意事項:</strong><br>
+          ・本共有は同一Wi-Fi/有線LAN内の直接HTTP通信を使用します。<br>
+          ・接続コードはアクセス認証用であり、通信自体を暗号化（HTTPS）するものではありません。<br>
+          ・公衆Wi-Fiや安全性の不明なネットワークでは通信が傍受されるリスクがあります。信頼できるプライベートLANでのみご利用ください。<br>
+          ・外部クラウドや外部DBへの送信は一切行いません。クリップボード自体も勝手には共有されません。
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="mini-btn" onclick="closeShareModal()">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 統合設定モーダル (モデル管理 + 辞書 + ショートカット) -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width:580px;">
+      <div class="modal-header">
+        <span>設定</span>
+        <button style="background:none; border:none; cursor:pointer;" onclick="closeSettingsModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
+        <section class="setup-section" aria-labelledby="audio-settings-heading">
+          <div class="setup-title"><strong id="audio-settings-heading">音声入力</strong><button class="mini-btn" onclick="refreshAudioDevices()">機器を更新</button></div>
+          <label class="setup-field">マイク<select id="audio-input" onchange="saveAudioSettings()"><option value="">システムの既定</option></select></label>
+          <label class="setup-field">再生先<select id="audio-output" onchange="saveAudioSettings(); applyAudioOutput()"><option value="">システムの既定</option></select></label>
+          <div class="audio-options">
+            <label><input id="audio-noise" type="checkbox" onchange="saveAudioSettings()"> 雑音抑制</label>
+            <label><input id="audio-echo" type="checkbox" onchange="saveAudioSettings()"> エコー除去</label>
+            <label><input id="audio-gain" type="checkbox" onchange="saveAudioSettings()"> 自動音量調整</label>
+          </div>
+          <p class="setup-note" id="audio-settings-status" role="status">設定は次の録音から反映されます。</p>
+          <div class="setup-actions"><button class="mini-btn" id="audio-test-button" onclick="testAudioInput()">3秒テスト録音</button><audio id="audio-test-playback" controls style="width:min(100%, 290px);height:36px" aria-label="テスト音声を再生"></audio></div>
+        </section>
+        <section class="setup-section" aria-labelledby="session-settings-heading">
+          <strong id="session-settings-heading">発言の処理</strong>
+          <label class="setup-field">文字化のタイミング<select id="recording-mode"><option value="streaming">発言中から表示</option><option value="high_accuracy">発言終了後に処理</option></select></label>
+          <label class="setup-field">発言音声<select id="audio-retention" onchange="updateRetentionField()"><option value="delete_on_success">処理後に削除</option><option value="retain">保存して聞き直す</option></select></label>
+          <label class="setup-field">保存日数（0 は自動削除しない）<input id="retention-days" type="number" min="0" max="3650" step="1" value="0" disabled></label>
+          <p class="setup-note">保存日数を指定すると、新しい音声の保存時に期限を過ぎた音声を削除します。</p>
+          <div class="setup-actions"><button class="mini-btn" onclick="saveSessionSettings()">保存</button><span id="session-settings-status" role="status"></span></div>
+        </section>
+        <section class="setup-section" aria-labelledby="setup-heading">
+          <div class="setup-title"><strong id="setup-heading">使い始める準備</strong><button class="mini-btn" onclick="refreshSetup()">状態を更新</button></div>
+          <div id="setup-summary" role="status">準備状況を確認しています</div>
+          <div id="setup-components" class="setup-checks"></div>
+          <details class="setup-note"><summary>不足している部品の導入方法</summary>
+            <p>Mac：Homebrew がある場合はターミナルで <code>brew install ffmpeg whisper.cpp</code> を実行します。Ollama は <a href="https://ollama.com/download" target="_blank" rel="noreferrer">公式サイト</a>からインストールして起動します。</p>
+            <p>Windows：<a href="https://ollama.com/download" target="_blank" rel="noreferrer">Ollama</a>、FFmpeg、whisper.cpp を導入してください。詳しくは配布ガイドをご覧ください。</p>
+          </details>
+          <p class="setup-note">モデルは選んでからダウンロードします。初回の準備にはインターネット接続が必要です。</p>
+        </section>
+        <section class="setup-section" aria-labelledby="storage-heading">
+          <strong id="storage-heading">保存先</strong>
+          <label class="setup-field">音声認識モデルの保存先<input id="setup-models-dir" type="text" autocomplete="off"></label>
+          <label class="setup-field">議事録の保存先<input id="setup-data-dir" type="text" autocomplete="off"></label>
+          <p id="setup-storage-status" class="setup-note">整文モデルは Ollama の保存先を使用します。変更後も既存ファイルは移動されません。</p>
+          <button class="mini-btn" onclick="saveStorageSettings()">保存先を変更</button>
+        </section>
+        <section class="setup-section" aria-labelledby="download-heading">
+          <strong id="download-heading">モデルを追加</strong>
+          <label class="setup-field">音声認識モデル<select id="download-whisper"></select></label>
+          <div class="setup-actions"><button class="mini-btn mini-btn-primary" onclick="startModelDownload('whisper')">ダウンロード</button><span id="progress-whisper" role="status"></span></div>
+          <label class="setup-field">文章を整えるモデル<select id="download-llm"></select></label>
+          <div class="setup-actions"><button class="mini-btn mini-btn-primary" onclick="startModelDownload('llm')">ダウンロード</button><span id="progress-llm" role="status"></span></div>
+        </section>
+        <!-- LLM管理 -->
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:10px;">
+          <div style="font-weight:700; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+            <span>文章を整えるモデル</span>
+            <span id="llm-status-pill" class="status-pill"><span class="dot"></span> 確認中</span>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+            <select id="select-llm-model" style="flex:1; padding:4px; font-size:0.78rem; border:1px solid var(--border); border-radius:4px;"></select>
+            <button class="mini-btn mini-btn-primary" onclick="applyLlmSelect()">切り替え</button>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="mini-btn" onclick="preloadLlm()">モデルを読み込む</button>
+            <button class="mini-btn mini-btn-danger" onclick="unloadLlm()">モデルを終了</button>
+          </div>
+        </div>
+
+        <!-- Whisper管理 -->
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:10px;">
+          <div style="font-weight:700; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+            <span>音声認識モデル</span>
+            <span id="whisper-status-pill" class="status-pill"><span class="dot"></span> 確認中</span>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <select id="select-whisper-model" style="flex:1; padding:4px; font-size:0.78rem; border:1px solid var(--border); border-radius:4px;"></select>
+            <button class="mini-btn mini-btn-primary" onclick="applyWhisperSelect()">切り替え</button>
+          </div>
+        </div>
+
+        <div>
+          <div style="font-weight:700; margin-bottom:8px;">F2 の操作</div>
+          <label><input type="radio" name="cue_mode" value="hold" onchange="setCueMode(this.value)"> 長押し中に文字化</label>
+          <label style="margin-left:16px;"><input type="radio" name="cue_mode" value="toggle" checked onchange="setCueMode(this.value)"> 押すたびに開始・終了</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="mini-btn" onclick="closeSettingsModal()">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="documents-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width:620px;">
+      <div class="modal-header"><span>会議情報</span><button style="background:none;border:0;cursor:pointer" onclick="closeDocumentsModal()" aria-label="閉じる">&times;</button></div>
+      <div class="modal-body" style="display:grid;gap:16px;">
+        <div class="setup-actions"><span class="setup-note">現在の会議に登録します</span><button class="mini-btn" onclick="startNewMeeting()">新しい会議</button></div>
+<details class="setup-section"><summary>参加国</summary>
+          <p class="setup-note">国名を入力して指示文をコピーし、外部 AI の回答を貼り付けます。</p><label class="setup-field">参加国名を入力<textarea id="country-prompt-names" rows="3" placeholder="アメリカ、ノルウェーなど"></textarea></label>
+          <button class="mini-btn" onclick="copyScopedPrompt('countries')">指示文をコピー</button>
+          <label class="setup-field">回答を貼り付け<textarea id="import-countries-text" rows="5" oninput="resetScopedImport('countries')"></textarea></label>
+          <button class="mini-btn" onclick="previewScopedImport('countries')">内容を確認</button>
+          <div id="import-countries-review" hidden><pre id="import-countries-preview" class="import-preview"></pre><button class="mini-btn mini-btn-primary" onclick="confirmScopedImport('countries')">確認して登録</button></div>
+          <p id="import-countries-status" class="setup-note" role="status"></p>
+        </details>        <details class="setup-section"><summary>登録済みの参加国</summary>
+          <details><summary>国を探して追加</summary>
+            <label class="setup-field">国名・コードで検索<input id="country-search" type="search" oninput="renderCountryOptions()" placeholder="アメリカ、USA など"></label>
+            <div id="country-options" class="country-options"></div>
+            <button class="mini-btn" onclick="addSelectedCountries()">選択した国を追加</button>
+          </details>
+          <label class="setup-field" for="country-codes">国コードと国名（１行に１つ）</label>
+          <textarea id="country-codes" rows="4" placeholder="USA アメリカ&#10;NOR ノルウェー&#10;TUN チュニジア" style="width:100%;padding:8px;border:1px solid #b9c8da;border-radius:5px;"></textarea>
+          <p class="setup-note">登録した国名を整文時にコードへ変換します。会議独自のコードも入力できます。</p>
+          <button class="mini-btn" onclick="saveCountryCodes()">参加国を保存</button>
+        </details>
+<details class="setup-section"><summary>本会議辞書を作る</summary>
+          <p class="setup-note">指示文と BG を外部 AI に渡し、辞書の回答を貼り付けます。</p>
+          <button class="mini-btn" onclick="copyScopedPrompt('terms')">指示文をコピー</button>
+          <label class="setup-field">回答を貼り付け<textarea id="import-terms-text" rows="5" oninput="resetScopedImport('terms')"></textarea></label>
+          <button class="mini-btn" onclick="previewScopedImport('terms')">内容を確認</button>
+          <div id="import-terms-review" hidden><p id="import-terms-count" class="setup-note" role="status"></p><pre id="import-terms-preview" class="import-preview"></pre><button id="import-terms-confirm" class="mini-btn mini-btn-primary" onclick="confirmScopedImport('terms')">登録する</button></div>
+          <p id="import-terms-status" class="setup-note" role="status"></p>
+        </details>        <!-- 辞書設定 -->
+        <details class="setup-section" id="registered-dictionary"><summary>登録済みの用語辞書</summary>
+        <div style="padding:4px 0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+            <span style="font-weight:700;">用語辞書</span>
+            <div style="display:flex; flex-wrap:wrap; gap:4px;">
+              <button class="mini-btn mini-btn-primary" id="btn-dict-common" onclick="switchDictType('common')">共通辞書</button>
+              <button class="mini-btn" id="btn-dict-session" onclick="switchDictType('session')">本会議辞書</button>
+              <button class="mini-btn" onclick="toggleAddTermForm()">用語を追加</button>
+            </div>
+          </div>
+          <p style="font-size:12px; color:var(--text-muted); margin:0 0 8px;">同じ見出し語は登録済みの内容を残します。</p>
+          <div id="add-term-box" style="display:none; background:#ffffff; padding:8px; border:1px solid var(--border); border-radius:4px; margin-bottom:8px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px;">
+              <input type="text" id="new-term-surface" placeholder="見出し語 (例: アンモデ)" style="padding:4px; font-size:0.75rem; border:1px solid var(--border); border-radius:3px;">
+              <input type="text" id="new-term-replacement" placeholder="置換正式名 (例: アンモデレート・コーカス)" style="padding:4px; font-size:0.75rem; border:1px solid var(--border); border-radius:3px;">
+            </div>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="new-term-desc" placeholder="説明 (任意)" style="flex:1; padding:4px; font-size:0.75rem; border:1px solid var(--border); border-radius:3px;">
+              <button class="mini-btn mini-btn-primary" onclick="submitNewTerm()">保存</button>
+              <button class="mini-btn" onclick="toggleAddTermForm()">キャンセル</button>
+            </div>
+          </div>
+          <div style="max-height:160px; overflow-y:auto; border:1px solid var(--border); border-radius:4px; background:#ffffff;">
+            <table style="width:100%; border-collapse:collapse; font-size:0.72rem;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border); background:#f1f5f9; color:var(--text-muted); text-align:left;">
+                  <th style="padding:4px 6px;">見出し語</th>
+                  <th style="padding:4px 6px;">置換・正式表記</th>
+                  <th style="padding:4px 6px;">説明</th>
+                </tr>
+              </thead>
+              <tbody id="dict-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+        </details>
+
+<details class="setup-section"><summary>会議の背景を作る</summary>
+          <p class="setup-note">指示文と BG を外部 AI に渡し、背景の回答を貼り付けます。</p>
+          <button class="mini-btn" onclick="copyScopedPrompt('context')">指示文をコピー</button>
+          <label class="setup-field">回答を貼り付け<textarea id="import-context-text" rows="5" oninput="resetScopedImport('context')"></textarea></label>
+          <button class="mini-btn" onclick="previewScopedImport('context')">内容を確認</button>
+          <div id="import-context-review" hidden><pre id="import-context-preview" class="import-preview"></pre><button class="mini-btn mini-btn-primary" onclick="confirmScopedImport('context')">確認して登録</button></div>
+          <p id="import-context-status" class="setup-note" role="status"></p>
+        </details>
+        <details class="setup-section"><summary>登録済みの背景</summary>
+          <div id="meeting-context-list" class="document-list"></div>
+        </details>
+        <details class="setup-section"><summary>登録済みの資料</summary>
+          <div id="document-list" class="document-list" aria-live="polite"></div>
+          <span id="document-status" class="setup-note" role="status"></span>
+          <select id="external-document" hidden></select>
+        </details>
+        <section id="document-review" class="setup-section" hidden>
+          <div class="setup-title"><strong id="document-review-title">抽出した用語</strong><span id="document-review-status" class="setup-note" role="status"></span></div>
+          <p class="setup-note">使う用語を選び、表記を確認してください。</p>
+          <div class="term-row setup-note"><span></span><span>用語</span><span>表記</span></div>
+          <div id="document-terms" style="max-height:240px;overflow:auto"></div>
+          <label id="document-context-field" class="setup-field">会議の背景<textarea id="document-context" rows="4" style="width:100%;padding:8px;border:1px solid #b9c8da;border-radius:5px"></textarea></label>
+          <button class="mini-btn mini-btn-primary" onclick="confirmDocumentTerms()">確認して登録</button>
+        </section>
+      </div>
+      <div class="modal-footer"><button class="mini-btn" onclick="closeDocumentsModal()">閉じる</button></div>
+    </div>
+  </div>
+
+  <div id="help-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width:580px;">
+      <div class="modal-header"><span>使い方</span><button style="background:none;border:0;cursor:pointer;" onclick="closeHelpModal()" aria-label="閉じる">&times;</button></div>
+      <div class="modal-body" style="display:grid;gap:16px;">
+        <div><strong>初めての準備</strong><p class="setup-note">Mac と Windows の導入手順、ターミナルの開き方、権限設定はガイドをご覧ください。コマンドはガイドからコピーできます。</p><p><a href="https://github.com/MUN-DX/mun-minutes-assistant/blob/main/docs/%E9%85%8D%E5%B8%83%E3%83%BB%E7%92%B0%E5%A2%83%E6%A7%8B%E7%AF%89%E3%82%AC%E3%82%A4%E3%83%89.md" target="_blank" rel="noreferrer">初期設定ガイドを開く ↗</a></p></div>
+        <div><strong>録音して文字にする</strong><p class="setup-note">「マイクをオン」を押し、発言の始めと終わりに F2 を押します。長押し方式も設定で選べます。</p></div>
+        <div><strong>辞書</strong><p class="setup-note">画面上部の「会議情報」から、参加国・用語・背景を登録できます。</p></div>
+        <div><strong>終了と削除</strong><p class="setup-note">使い終わったら、録音を止めて画面上部の「終了」を押します。削除方法はガイドにあります。</p></div>
+      </div>
+      <div class="modal-footer"><button class="mini-btn" onclick="closeHelpModal()">閉じる</button></div>
+    </div>
+  </div>
+
+  <div id="candidate-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width:760px;">
+      <div class="modal-header"><span>完成版を確認</span><button style="background:none;border:0;cursor:pointer;" onclick="closeCandidate()" aria-label="閉じる">&times;</button></div>
+      <div class="modal-body">
+        <p class="setup-note">編集・コピーした文章はそのままです。完成版を確認してから選んでください。</p>
+        <div class="candidate-compare">
+          <div><strong>現在の文章</strong><div id="candidate-current" class="candidate-text"></div></div>
+          <div><strong>完成版の候補</strong><div id="candidate-proposed" class="candidate-text"></div></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="mini-btn" onclick="resolveCandidate('keep')">現在の文章を残す</button><button class="mini-btn mini-btn-primary" onclick="resolveCandidate('apply')">完成版を使う</button></div>
+    </div>
+  </div>
+
+  <!-- 履歴モーダル -->
+  <div id="history-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span>履歴</span>
+        <button style="background:none; border:none; cursor:pointer;" onclick="closeHistoryModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="history-list" style="display:flex; flex-direction:column; gap:6px;">
+          読み込み中...
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="mini-btn" onclick="closeHistoryModal()">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // グローバル状態
+  let currentSessionId = "";
+  window.getCurrentSessionId = () => currentSessionId;
+  let isRecording = false;
+  let recordingStarting = false;
+  let isCueHolding = false;
+  let cueStartTime = null;
+  let recStartTime = null;
+  let timerInterval = null;
+  let audioContext = null;
+  let mediaStream = null;
+  let lastLevelUpdate = 0;
+  let lastAudioCallbackAt = 0;
+  let audioInterruptionReported = false;
+  let audioTestUrl = null;
+  let scriptProcessor = null;
+  let pcmChunks = [];
+  let ringBuffer = [];
+  let currentCueKey = "F2";
+  let cueMode = "toggle";
+  let globalKeysAvailable = false;
+  const trackedUtterances = new Map();
+  let cuePolling = false;
+  let cueStatusSupported = true;
+  let activeDictType = "common";
+  let currentDict = {};
+  let loadedCountries = [];
+  let countriesLoadedFor = null;
+  let countryCatalog = null;
+  const selectedCountryCodes = new Set();
+
+  // 2台目共有・ブロック状態
+  let isGuestMode = false;
+  let shareToken = localStorage.getItem("mun_share_token") || "";
+  let guestRole = localStorage.getItem("mun_share_role") || "editor";
+  let currentBlocks = [];
+  let isSharingEnabled = false;
+  let pollInterval = null;
+  let userIsEditing = false;
+  let editingBlockId = null;
+
+  window.addEventListener('beforeunload', event => {
+    const unsent = [...trackedUtterances.values()].some(item => item.failed?.length || item.finishError || !item.done);
+    if (isRecording || recordingStarting || unsent) { event.preventDefault(); event.returnValue = ''; }
+  });
+
+  function showToast(message, durationMs = 3500) {
+    const container = document.getElementById("toast-container");
+    const toast = document.createElement("div");
+    toast.className = "toast-card";
+    const text = document.createElement("span");
+    text.textContent = message;
+    const close = document.createElement("button");
+    close.className = "toast-close"; close.textContent = "×";
+    toast.append(text, close);
+    toast.querySelector(".toast-close").onclick = () => toast.remove();
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transition = "opacity 0.3s ease";
+      setTimeout(() => toast.remove(), 300);
+    }, durationMs);
+  }
+
+  function getMarginSec() {
+    const val = parseFloat(document.getElementById("input-margin-sec")?.value);
+    return isNaN(val) ? 2.0 : Math.max(0.0, Math.min(8.0, val));
+  }
+
+  // 初期化
+  window.addEventListener("DOMContentLoaded", async () => {
+    // URLクエリパラメータの確認 (?code=... または ?join=...)
+    const params = new URLSearchParams(window.location.search);
+    const joinCode = params.get("code") || params.get("join");
+    if (joinCode) {
+      document.getElementById("input-guest-code").value = joinCode;
+    }
+
+    // ホストかゲスト（または共有状態）の判定
+    await checkInitialMode();
+
+    if (!isGuestMode) {
+      await initActiveSession();
+      await checkSystemAndModels();
+      await loadCueSettings();
+      setupKeyListeners();
+      setInterval(pollUtterances, 300);
+    }
+
+    // ブロック定期同期 (500ms〜1000ms)
+    startBlockSyncLoop();
+  });
+
+  async function checkInitialMode() {
+    try {
+      const resp = await fetch("/api/share/status");
+      const data = await resp.json();
+      if (data.ok) {
+        isSharingEnabled = data.enabled;
+        updateShareBadge(data.enabled);
+
+        // 外部IPからのアクセスの場合はゲストモード判定
+        // ホスト（127.0.0.1）以外で未認証なら参加画面を表示
+        const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+        if (!isLocalHost) {
+          isGuestMode = true;
+          document.getElementById("btn-rec-standby").style.display = "none";
+          document.getElementById("btn-cue-mark").style.display = "none";
+          document.getElementById("box-margin-setting").style.display = "none";
+          document.getElementById("btn-open-share").style.display = "none";
+          document.getElementById("btn-documents").style.display = "none";
+          document.getElementById("btn-settings").style.display = "none";
+          document.getElementById("btn-shutdown").style.display = "none";
+          document.getElementById("guest-indicator").style.display = "inline-flex";
+
+          if (!shareToken) {
+            document.getElementById("guest-join-screen").style.display = "block";
+            document.getElementById("blocks-view").style.display = "none";
+          } else {
+            document.getElementById("guest-join-screen").style.display = "none";
+            document.getElementById("blocks-view").style.display = "flex";
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("初期モード確認エラー:", e);
+    }
+  }
+
+  async function submitGuestJoin() {
+    const code = document.getElementById("input-guest-code").value.trim();
+    if (!code) {
+      showToast("⚠️ 接続コードを入力してください。");
+      return;
+    }
+    try {
+      const resp = await fetch("/api/share/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        shareToken = data.token;
+        guestRole = data.role || "editor";
+        if (data.session_id) {
+          currentSessionId = data.session_id;
+          localStorage.setItem("mun_shared_session_id", currentSessionId);
+        }
+        localStorage.setItem("mun_share_token", shareToken);
+        localStorage.setItem("mun_share_role", guestRole);
+        document.getElementById("guest-join-screen").style.display = "none";
+        document.getElementById("blocks-view").style.display = "flex";
+        showToast("🎉 2台目共有に参加しました！");
+        await syncBlocksNow();
+      } else {
+        showToast("❌ " + (data.error || "接続コードが無効です。"));
+      }
+    } catch (e) {
+      showToast("❌ 参加リクエストに失敗しました: " + e.message);
+    }
+  }
+
+  async function initActiveSession(forceNew = false) {
+    try {
+      const savedId = forceNew ? null : localStorage.getItem('mun_host_session_id');
+      let sessionId = null;
+      if (savedId) {
+        const response = await fetch(`/api/session/${encodeURIComponent(savedId)}`);
+        if (response.ok) {
+          const saved = await response.json();
+          if (saved.session_id !== savedId) throw new Error('会議の確認に失敗しました');
+          sessionId = savedId;
+        } else if (response.status !== 404) {
+          throw new Error('会議を読み込めませんでした');
+        }
+      }
+      if (!sessionId) {
+        const headers = {};
+        if (window.__HOST_CSRF_TOKEN__) headers["X-Host-CSRF-Token"] = window.__HOST_CSRF_TOKEN__;
+        const response = await fetch("/api/session/start", {method:"POST", headers});
+        const data = await response.json();
+        if (!response.ok || !data.ok || !data.session_id) throw new Error(data.error || '会議を作成できませんでした');
+        sessionId = data.session_id;
+      }
+      currentSessionId = sessionId;
+      window.currentSessionId = sessionId;
+      localStorage.setItem('mun_host_session_id', sessionId);
+      document.getElementById("badge-rec-status").innerHTML = `<span class="dot"></span> マイクオフ`;
+      return true;
+    } catch (e) {
+      console.warn("セッション初期化失敗:", e);
+      showToast('会議を読み込めませんでした。接続を確認してください', 10000);
+      return false;
+    }
+  }
+
+  async function startNewMeeting() {
+    if (isRecording || recordingStarting || isSharingEnabled) {
+      showToast('マイクと共有を停止してから新しい会議を作成してください'); return;
+    }
+    if ([...trackedUtterances.values()].some(item => item.failed?.length || item.finishError || !item.done)) {
+      showToast('発言の処理が終わってから会議を切り替えてください'); return;
+    }
+    await Promise.all(Object.values(saveChains));
+    if (Object.keys(failedCellSaves).length || Object.values(pendingCellSaves).some(count => count > 0)) {
+      showToast('編集中の発言を保存してから会議を切り替えてください'); return;
+    }
+    if (!confirm('新しい会議を作成しますか？ 現在の会議は履歴に残ります。')) return;
+    if (!await initActiveSession(true)) return;
+    await syncBlocksNow();
+    await Promise.all([refreshDocuments(), refreshMeetingContexts(), loadDictionaryData(), loadCountryCodes()]);
+    showToast('新しい会議を作成しました');
+  }
+
+  // ブロック同期ループ
+  function startBlockSyncLoop() {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(async () => {
+      await syncBlocksNow();
+    }, 1000);
+  }
+
+  async function syncBlocksNow() {
+    if (!currentSessionId && isGuestMode) {
+      currentSessionId = localStorage.getItem("mun_shared_session_id") || "";
+    }
+
+    if (!currentSessionId) return;
+
+    try {
+      const headers = {};
+      if (isGuestMode && shareToken) headers["X-Share-Token"] = shareToken;
+      const resp = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/blocks`, { headers });
+      if (resp.status === 401 || resp.status === 403) {
+        if (isGuestMode) {
+          showToast("⚠️ 共有セッションが切断されました。再接続してください。");
+          shareToken = "";
+          localStorage.removeItem("mun_share_token");
+          document.getElementById("guest-join-screen").style.display = "block";
+          document.getElementById("blocks-view").style.display = "none";
+        }
+        return;
+      }
+      const data = await resp.json();
+      if (data.ok && Array.isArray(data.blocks)) {
+        renderBlocks(data.blocks);
+      }
+    } catch (e) {
+      document.getElementById("sync-status-indicator").innerText = "○ 同期待機";
+    }
+  }
+
+  function renderBlocks(newBlocks) {
+    const container = document.getElementById("blocks-view");
+    const placeholder = document.getElementById("empty-placeholder");
+    const countBadge = document.getElementById("block-count-badge");
+    const restoreBtn = document.getElementById("btn-restore-blocks");
+
+    countBadge.innerText = `${newBlocks.length} 件`;
+
+    if (newBlocks.length === 0) {
+      placeholder.style.display = "flex";
+      // 既存カードの消去
+      container.querySelectorAll(".speech-block-card").forEach(el => el.remove());
+      currentBlocks = [];
+      return;
+    }
+
+    placeholder.style.display = "none";
+
+    // スクロール位置の保護
+    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 60;
+    const activeEl = document.activeElement;
+    const activeBlockId = activeEl && activeEl.dataset ? activeEl.dataset.blockId : null;
+
+    newBlocks.forEach((block, index) => {
+      let card = document.getElementById(`block-card-${block.id}`);
+      if (!card) {
+        card = document.createElement("div");
+        card.id = `block-card-${block.id}`;
+        card.className = "speech-block-card";
+        card.innerHTML = `
+          <div class="block-header">
+            <div class="block-header-left">
+              <span class="block-tag">${block.label || '発言 #' + (index + 1)}</span>
+              <span class="block-time">${block.created_at || ''}</span>
+            </div>
+            <div class="block-header-right">
+              <label class="transcribe-check-label" title="Google Docs等への転記完了をチェックします">
+                <input type="checkbox" class="check-transcribed" data-id="${block.id}" ${block.is_transcribed ? 'checked' : ''} onchange="handleTranscribeToggle('${block.id}', this.checked)">
+                <span>転記済</span>
+              </label>
+              <span class="cell-state" aria-live="polite"></span>
+              <button class="block-btn review" style="display:none" onclick="openCandidate('${block.id}')">完成版を確認</button>
+              <button class="block-btn retry" style="display:none" onclick="retryUtterance('${block.utterance_id}')">再試行</button>
+              <button class="block-btn audio" style="display:none" onclick="openBlockAudio('${block.id}')">音声</button>
+              <button class="block-btn copy" onclick="copySingleBlock('${block.id}')" title="この発言をコピー">コピー</button>
+
+            </div>
+          </div>
+          <div
+            class="block-content-text"
+            contenteditable="${guestRole === 'viewer' && isGuestMode ? 'false' : 'true'}"
+            data-block-id="${block.id}"
+            onfocus="handleCellFocus('${block.id}', this)"
+            onbeforeinput="if (this.dataset.protection && this.dataset.protection !== 'ready') event.preventDefault()"
+            oninput="handleCellInput('${block.id}', this)"
+            onkeydown="handleCellKeydown(event, '${block.id}', this)"
+            onblur="handleBlockTextBlur('${block.id}', this.innerText)"
+          >${escapeHtml(block.text || '')}</div>
+          <audio class="block-audio" controls hidden aria-label="発言の音声を再生"></audio>
+          <button class="block-btn block-delete-audio" hidden onclick="deleteBlockAudio('${block.id}')">音声を削除</button>
+        `;
+        container.appendChild(card);
+      } else {
+        // 既存カードの更新 (編集中でなければ本文更新)
+        const textDiv = card.querySelector(".block-content-text");
+        if (textDiv && activeBlockId !== block.id) {
+          if (textDiv.innerText !== block.text) textDiv.innerText = block.text || '';
+        } else if (textDiv) {
+          appendIncomingText(block.id, textDiv, block);
+        }
+        const chk = card.querySelector(".check-transcribed");
+        if (chk && chk.checked !== Boolean(block.is_transcribed)) {
+          chk.checked = Boolean(block.is_transcribed);
+        }
+      }
+
+      const stateLabel = card.querySelector(".cell-state");
+      card.dataset.status = block.status || '';
+      const reviewButton = card.querySelector(".review");
+      const retryButton = card.querySelector(".retry");
+      const audioButton = card.querySelector(".audio");
+      const labels = {recording:"録音中", processing:"文字化中", finalizing:"仕上げ中", completed:"完了", needs_check:"原文を確認", pending_review:"要確認", failed:"処理に失敗"};
+      const clientError = block.utterance_id && trackedUtterances.get(block.utterance_id)?.finishError;
+      if (stateLabel) stateLabel.textContent = clientError ? "送信に失敗" : (labels[block.status] || "");
+      if (reviewButton) reviewButton.style.display = block.candidate_status === "pending" ? "" : "none";
+      if (retryButton) retryButton.style.display = !isGuestMode && (block.status === "failed" || clientError) && block.utterance_id ? "" : "none";
+      if (audioButton) audioButton.style.display = block.has_saved_audio && block.utterance_id ? "" : "none";
+      if (block.is_transcribed) {
+        card.classList.add("transcribed");
+      } else {
+        card.classList.remove("transcribed");
+      }
+    });
+
+    // 削除されたカードの除去
+    const newIds = new Set(newBlocks.map(b => `block-card-${b.id}`));
+    container.querySelectorAll(".speech-block-card").forEach(el => {
+      if (!newIds.has(el.id)) {
+        const player = el.querySelector('.block-audio');
+        if (player?.src.startsWith('blob:')) URL.revokeObjectURL(player.src);
+        el.remove();
+      }
+    });
+
+    currentBlocks = newBlocks;
+
+    // スクロール追従（最下部にいた場合のみスクロール、閲覧・編集中は維持）
+    if (isAtBottom && !activeBlockId) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  async function openBlockAudio(blockId) {
+    const block = currentBlocks.find(item => item.id === blockId);
+    const player = document.getElementById(`block-card-${blockId}`)?.querySelector('.block-audio');
+    if (!block?.utterance_id || !player) return;
+    const deleteButton = player.parentElement.querySelector('.block-delete-audio');
+    if (player.src) { player.hidden = !player.hidden; if (deleteButton) deleteButton.hidden = player.hidden || (isGuestMode && guestRole === 'viewer'); return; }
+    try {
+      const response = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/utterance/${encodeURIComponent(block.utterance_id)}/audio`, {headers:authHeaders()});
+      if (!response.ok) throw new Error('保存された音声を読み込めませんでした');
+      player.src = URL.createObjectURL(await response.blob());
+      player.hidden = false;
+      if (deleteButton) deleteButton.hidden = isGuestMode && guestRole === 'viewer';
+      let outputId = ''; try { outputId = JSON.parse(localStorage.getItem('mun-audio-settings') || '{}').outputId || ''; } catch (_) {}
+      if (typeof player.setSinkId === 'function') await player.setSinkId(outputId);
+      await player.play().catch(() => {});
+    } catch (error) { showToast(error.message); }
+  }
+  async function deleteBlockAudio(blockId) {
+    const block = currentBlocks.find(item => item.id === blockId);
+    const card = document.getElementById(`block-card-${blockId}`);
+    if (!block?.utterance_id || !card || !confirm('この発言の保存音声を削除しますか？')) return;
+    try {
+      const result = await setupRequest(sessionApi(`/utterance/${encodeURIComponent(block.utterance_id)}/audio/delete`), {});
+      if (!result.deleted) throw new Error('保存音声が見つかりません');
+      const player = card.querySelector('.block-audio');
+      player.pause(); if (player.src.startsWith('blob:')) URL.revokeObjectURL(player.src);
+      player.removeAttribute('src'); player.hidden = true;
+      card.querySelector('.block-delete-audio').hidden = true;
+      await syncBlocksNow();
+    } catch (error) { showToast(error.message); }
+  }
+
+  async function writeClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    const input = document.createElement("textarea");
+    input.value = text; input.style.position = "fixed"; input.style.opacity = "0";
+    document.body.appendChild(input); input.select();
+    const ok = document.execCommand("copy"); input.remove();
+    if (!ok) throw new Error("コピーできませんでした");
+  }
+
+  function authHeaders() {
+    const headers = {"Content-Type": "application/json"};
+    if (isGuestMode && shareToken) headers["X-Share-Token"] = shareToken;
+    else if (window.__HOST_CSRF_TOKEN__) headers["X-Host-CSRF-Token"] = window.__HOST_CSRF_TOKEN__;
+    return headers;
+  }
+  async function cellAction(action, body) {
+    const response = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/blocks/${action}`, {
+      method:"POST", headers:authHeaders(), body:JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "保存できませんでした");
+    return data;
+  }
+  const pendingCellSaves = {};
+  async function handleCellFocus(id, el) {
+    el.dataset.baseText = el.innerText;
+    const block = currentBlocks.find(item => item.id === id);
+    el.dataset.seenChunks = JSON.stringify(Object.keys(block?.chunk_pieces || {}));
+    if (block?.utterance_id && block.status !== "completed" && (!isGuestMode || guestRole === "editor")) {
+      el.dataset.protection = "pending";
+      try {
+        const reserved = await cellAction("copy", {block_id:id});
+        if (el.innerText === el.dataset.baseText && reserved.text !== el.innerText) {
+          el.innerText = reserved.text || "";
+          el.dataset.baseText = reserved.text || "";
+        }
+        el.dataset.protection = "ready";
+      } catch (error) {
+        el.dataset.protection = "failed";
+        showToast("編集の準備に失敗しました。もう一度選んでください", 6000);
+      }
+    }
+  }
+  function appendIncomingText(id, el, block) {
+    if (pendingCellSaves[id]) return;
+    const base = el.dataset.baseText ?? "";
+    const remote = block.text || "";
+    if (remote === base || !remote.startsWith(base)) return;
+    const suffix = remote.slice(base.length);
+    if (!suffix) return;
+    let seen;
+    try { seen = new Set(JSON.parse(el.dataset.seenChunks || "[]")); } catch (_) { seen = new Set(); }
+    const pieces = block.chunk_pieces || {};
+    const newKeys = Object.keys(pieces).filter(key => !seen.has(key)).sort((a, b) => Number(a) - Number(b));
+    if (!newKeys.length || newKeys.map(key => pieces[key]).join("") !== suffix) return;
+    const local = el.innerText;
+    const wasEdited = local !== base;
+    // 末尾にテキストノードを追加し、編集中の選択範囲を維持する。
+    el.appendChild(document.createTextNode(suffix));
+    el.dataset.baseText = remote;
+    el.dataset.seenChunks = JSON.stringify([...seen, ...newKeys]);
+    if (wasEdited) handleBlockTextInput(id, el.innerText);
+  }
+  async function handleCellInput(id, el) {
+    handleBlockTextInput(id, el.innerText.replace(/\r/g, ""));
+  }
+  async function handleCellKeydown(event, id, el) {
+    // 段落を編集しても発言セルは分割・結合しない。
+  }
+
+  // ブロック操作
+  async function reserveBlockForCopy(blockId) {
+    if (saveChains[blockId]) await saveChains[blockId];
+    if (failedCellSaves[blockId]) throw new Error("編集を保存できていません。内容を確認してください");
+    return cellAction("copy", {block_id:blockId});
+  }
+  async function copySingleBlock(blockId) {
+    try {
+      const reserved = await reserveBlockForCopy(blockId);
+      if (!reserved.text) { showToast("コピーする文章がありません"); return; }
+      await writeClipboard(reserved.text);
+      showToast("コピーしました");
+    } catch (e) { showToast(e.message || "コピーに失敗しました", 6000); }
+  }
+  async function copyAllBlocksToClipboard() {
+    try {
+      await Promise.all(Object.values(saveChains));
+      const texts = [];
+      for (const block of currentBlocks) {
+        const result = await reserveBlockForCopy(block.id);
+        if (result.text) texts.push(result.text);
+      }
+      if (!texts.length) { showToast("コピーする文章がありません"); return; }
+      await writeClipboard(texts.join("\n\n")); showToast("全文をコピーしました");
+    } catch (e) { showToast(e.message || "コピーに失敗しました", 6000); }
+  }
+  let reviewSnapshot = null;
+  async function openCandidate(blockId) {
+    try {
+      if (saveChains[blockId]) await saveChains[blockId];
+      if (failedCellSaves[blockId]) throw new Error("編集を保存できていません");
+      await syncBlocksNow();
+      const block = currentBlocks.find(item => item.id === blockId);
+      if (!block || block.candidate_status !== "pending") throw new Error("確認する完成版がありません");
+      reviewSnapshot = {block_id:blockId, expected_version:block.version, base_text:block.text};
+      document.getElementById("candidate-current").textContent = block.text || "";
+      document.getElementById("candidate-proposed").textContent = block.final_candidate || "";
+      document.getElementById("candidate-modal").classList.add("active");
+    } catch (e) { showToast(e.message, 6000); }
+  }
+  function closeCandidate() { document.getElementById("candidate-modal").classList.remove("active"); reviewSnapshot = null; }
+  async function resolveCandidate(action) {
+    if (!reviewSnapshot) return;
+    try {
+      await cellAction("resolve-candidate", {...reviewSnapshot, action});
+      closeCandidate(); await syncBlocksNow(); showToast(action === "apply" ? "完成版を反映しました" : "現在の文章を残しました");
+    } catch (e) { showToast(e.message, 6000); await syncBlocksNow(); }
+  }
+  async function retryUtterance(utteranceId) {
+    try {
+      const tracked = trackedUtterances.get(utteranceId);
+      if (tracked?.failed?.length) {
+        const failures = tracked.failed.splice(0);
+        for (const item of failures) {
+          try {
+            const res = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/speech-chunk`, {method:"POST", headers:{"Content-Type":"audio/wav", "X-Utterance-Id":utteranceId, "X-Chunk-Seq":String(item.seq)}, body:item.blob});
+            if (!res.ok) throw new Error("送信失敗");
+          } catch (_) { tracked.failed.push(item); }
+        }
+        if (tracked.failed.length) throw new Error("音声を再送できませんでした");
+        await notifyUtteranceFinished(currentSessionId, utteranceId, tracked);
+      } else if (tracked?.finishError) {
+        await notifyUtteranceFinished(currentSessionId, utteranceId, tracked);
+      } else {
+        await setupRequest(`/api/session/${encodeURIComponent(currentSessionId)}/utterance/${encodeURIComponent(utteranceId)}/retry`, {});
+      }
+      await syncBlocksNow(); showToast("再試行しています");
+    } catch (e) { showToast(e.message, 6000); }
+  }
+
+  async function handleTranscribeToggle(blockId, isChecked) {
+    const card = document.getElementById(`block-card-${blockId}`);
+    if (card) {
+      if (isChecked) card.classList.add("transcribed");
+      else card.classList.remove("transcribed");
+    }
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (isGuestMode && shareToken) headers["X-Share-Token"] = shareToken;
+      else if (window.__HOST_CSRF_TOKEN__) headers["X-Host-CSRF-Token"] = window.__HOST_CSRF_TOKEN__;
+      await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/blocks/update`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ block_id: blockId, is_transcribed: isChecked })
+      });
+    } catch (e) {
+      console.warn("転記トグル更新エラー:", e);
+    }
+  }
+
+  let textDebounceTimers = {};
+  function handleBlockTextInput(blockId, newText) {
+    userIsEditing = true;
+    editingBlockId = blockId;
+    if (textDebounceTimers[blockId]) clearTimeout(textDebounceTimers[blockId]);
+    textDebounceTimers[blockId] = setTimeout(() => {
+      saveBlockText(blockId, newText);
+    }, 800);
+  }
+
+  function handleBlockTextBlur(blockId, newText) {
+    userIsEditing = false;
+    editingBlockId = null;
+    clearTimeout(textDebounceTimers[blockId]);
+    saveBlockText(blockId, newText);
+  }
+
+  const saveChains = {};
+  const failedCellSaves = {};
+  async function saveBlockText(blockId, newText) {
+    const el = document.querySelector(`[data-block-id="${blockId}"]`);
+    if (!el) return;
+    pendingCellSaves[blockId] = (pendingCellSaves[blockId] || 0) + 1;
+    saveChains[blockId] = (saveChains[blockId] || Promise.resolve()).then(async () => {
+      const base = el.dataset.baseText ?? "";
+      const result = await cellAction("update", {block_id:blockId, text:newText, base_text:base});
+      delete failedCellSaves[blockId];
+      el.dataset.baseText = newText;
+      if (document.activeElement !== el && el.innerText === newText) {
+        el.innerText = result.block.text;
+        el.dataset.baseText = result.block.text;
+      }
+    }).catch(e => { failedCellSaves[blockId] = true; showToast(e.message, 10000); }).finally(() => {
+      pendingCellSaves[blockId]--;
+    });
+    return saveChains[blockId];
+  }
+
+  async function splitBlock(blockId) {
+    const block = currentBlocks.find(b => b.id === blockId);
+    if (!block || !block.text) return;
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (isGuestMode && shareToken) headers["X-Share-Token"] = shareToken;
+      const resp = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/blocks/split`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ block_id: blockId })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        showToast("✂ 発言を2つに分割しました");
+        await syncBlocksNow();
+      } else {
+        showToast("❌ " + (data.error || "分割に失敗しました"));
+      }
+    } catch (e) {
+      showToast("❌ 分割エラー: " + e.message);
+    }
+  }
+
+  async function mergeBlock(blockId) {
+    const idx = currentBlocks.findIndex(b => b.id === blockId);
+    if (idx <= 0) {
+      showToast("⚠️ 直前のブロックが存在しないため結合できません");
+      return;
+    }
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (isGuestMode && shareToken) headers["X-Share-Token"] = shareToken;
+      const resp = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/blocks/merge`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ block_id: blockId })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        showToast("⤴ 直前の発言と結合しました");
+        await syncBlocksNow();
+      } else {
+        showToast("❌ " + (data.error || "結合に失敗しました"));
+      }
+    } catch (e) {
+      showToast("❌ 結合エラー: " + e.message);
+    }
+  }
+
+  async function toggleAllTranscribed() {
+    if (currentBlocks.length === 0) return;
+    const allChecked = currentBlocks.every(b => b.is_transcribed);
+    const targetState = !allChecked;
+    for (const b of currentBlocks) {
+      await handleTranscribeToggle(b.id, targetState);
+    }
+    showToast(targetState ? "✔ すべて転記済みにしました" : "○ 転記済みチェックを解除しました");
+    await syncBlocksNow();
+  }
+
+  async function clearBlocksView() {
+    if (!confirm("画面上の発言ブロックをクリアしますか？\n（※サーバー保存データ・議事録ファイルは完全に保護されており、いつでも復元できます）")) {
+      return;
+    }
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (shareToken) headers["X-Share-Token"] = shareToken;
+      await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/blocks/clear`, {
+        method: "POST",
+        headers
+      });
+      document.getElementById("btn-restore-blocks").style.display = "inline-flex";
+      showToast("🧹 画面表示をクリアしました（サーバー履歴は保護済）");
+      await syncBlocksNow();
+    } catch (e) {
+      showToast("❌ クリアエラー: " + e.message);
+    }
+  }
+
+  async function restoreBlocksView() {
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (isGuestMode && shareToken) headers["X-Share-Token"] = shareToken;
+      const resp = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/blocks/restore`, {
+        method: "POST",
+        headers
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        document.getElementById("btn-restore-blocks").style.display = "none";
+        showToast("↩️ 発言ブロックを履歴から復元しました！");
+        await syncBlocksNow();
+      }
+    } catch (e) {
+      showToast("❌ 復元エラー: " + e.message);
+    }
+  }
+
+  // 2台目共有モーダル操作
+  async function openShareModal() {
+    document.getElementById("share-modal").classList.add("active");
+    await refreshShareStatus();
+  }
+
+  function closeShareModal() {
+    document.getElementById("share-modal").classList.remove("active");
+  }
+
+  async function refreshShareStatus() {
+    try {
+      const resp = await fetch("/api/share/status");
+      const data = await resp.json();
+      if (data.ok) {
+        if (data.host_csrf_token) {
+          window.__HOST_CSRF_TOKEN__ = data.host_csrf_token;
+        }
+        isSharingEnabled = data.enabled;
+        const toggleBtn = document.getElementById("btn-toggle-share");
+        const activeInfo = document.getElementById("share-active-info");
+
+        if (data.enabled) {
+          toggleBtn.innerText = "共有を停止";
+          toggleBtn.className = "btn-main mini-btn-danger";
+          activeInfo.style.display = "flex";
+          document.getElementById("share-code-display").innerText = data.join_code || "MUN-????";
+          const lanIp = (data.lan_ips && data.lan_ips[0]) ? data.lan_ips[0] : window.location.hostname;
+          const portToUse = data.lan_port || (parseInt(window.location.port || 8000) + 1);
+          const shareUrl = `http://${lanIp}:${portToUse}/?code=${data.join_code}`;
+          document.getElementById("share-url-input").value = shareUrl;
+          document.getElementById("share-ip-list").innerText = `LAN IP: ${data.lan_ips?.join(', ') || '検出中'}`;
+          document.getElementById("share-guest-count").innerText = data.guest_count || 0;
+        } else {
+          toggleBtn.innerText = "共有を開始";
+          toggleBtn.className = "btn-main mini-btn-primary";
+          activeInfo.style.display = "none";
+        }
+        updateShareBadge(data.enabled);
+      }
+    } catch (e) {
+      console.warn("共有ステータス取得エラー:", e);
+    }
+  }
+
+  async function toggleShareState() {
+    try {
+      const willEnable = !isSharingEnabled;
+      if (willEnable && !currentSessionId) {
+        showToast("⚠️ 共有対象の会議（セッション）が開かれていません。");
+        return;
+      }
+      const roleChoice = document.querySelector('input[name="share_role"]:checked')?.value || "editor";
+      const headers = { "Content-Type": "application/json" };
+      if (window.__HOST_CSRF_TOKEN__) headers["X-Host-CSRF-Token"] = window.__HOST_CSRF_TOKEN__;
+      const resp = await fetch("/api/share/toggle", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({
+          enabled: willEnable,
+          role: roleChoice,
+          session_id: willEnable ? currentSessionId : undefined
+        })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        showToast(data.enabled ? "🔗 2台目共有を開始しました！" : "🔒 共有を停止しました");
+        await refreshShareStatus();
+      } else {
+        showToast("❌ " + (data.error || "切替に失敗しました"));
+      }
+    } catch (e) {
+      showToast("❌ エラー: " + e.message);
+    }
+  }
+
+  async function changeShareRole(role) {
+    if (!isSharingEnabled) return;
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (window.__HOST_CSRF_TOKEN__) headers["X-Host-CSRF-Token"] = window.__HOST_CSRF_TOKEN__;
+      await fetch("/api/share/toggle", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({ enabled: true, role: role, session_id: currentSessionId })
+      });
+      showToast(`権限を「${role === 'editor' ? '編集可' : '閲覧のみ'}」に変更しました`);
+    } catch (e) {}
+  }
+
+  async function terminateAllSharing() {
+    if (!confirm("すべての2台目接続を強制切断しますか？")) return;
+    try {
+      const headers = { "Content-Type": "application/json" };
+      if (window.__HOST_CSRF_TOKEN__) headers["X-Host-CSRF-Token"] = window.__HOST_CSRF_TOKEN__;
+      const resp = await fetch("/api/share/terminate", {
+        method: "POST",
+        headers: headers
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        showToast("🛑 全2台目接続を強制切断しました");
+        await refreshShareStatus();
+      }
+    } catch (e) {
+      showToast("❌ エラー: " + e.message);
+    }
+  }
+
+  function copyShareUrl() {
+    const input = document.getElementById("share-url-input");
+    input.select();
+    navigator.clipboard.writeText(input.value);
+    showToast("📋 参加URLをコピーしました！");
+  }
+
+  function updateShareBadge(enabled) {
+    const badge = document.getElementById("badge-share-status");
+    if (enabled) {
+      badge.style.display = "inline-flex";
+      badge.className = "status-pill sharing";
+      badge.innerHTML = `<span class="dot"></span> 共有ON`;
+    } else {
+      badge.style.display = "none";
+    }
+  }
+
+  // 設定・履歴モーダル
+  function openSettingsModal() { document.getElementById("settings-modal").classList.add("active"); checkSystemAndModels(); refreshSetup(); loadAudioSettings(); refreshAudioDevices(); loadSessionSettings(); }
+  function closeSettingsModal() { document.getElementById("settings-modal").classList.remove("active"); }
+  let reviewedDocumentId = null;
+  let reviewedDocumentSession = null;
+  let documentCandidates = [];
+  let sessionSettingsLoadedFor = null;
+  function sessionApi(suffix) { return `/api/session/${encodeURIComponent(currentSessionId)}${suffix}`; }
+  async function readSessionApi(suffix) {
+    const response = await fetch(sessionApi(suffix), {headers:authHeaders()});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || '読み込めませんでした');
+    return data;
+  }
+  function openDocumentsModal() { document.getElementById('documents-modal').classList.add('active'); refreshDocuments(); refreshMeetingContexts(); loadDictionaryData(); loadCountryCodes(); loadCountryCatalog(); }
+  function closeDocumentsModal() { document.getElementById('documents-modal').classList.remove('active'); }
+  async function refreshDocuments() {
+    const status = document.getElementById('document-status');
+    const list = document.getElementById('document-list');
+    const select = document.getElementById('external-document');
+    const sessionId = currentSessionId;
+    try {
+      const data = await readSessionApi('/documents');
+      if (sessionId !== currentSessionId) return;
+      list.replaceChildren(); select.replaceChildren();
+      if (!data.documents.length) { list.textContent = '資料はまだありません'; return; }
+      for (const doc of data.documents) {
+        select.add(new Option(doc.title, doc.id));
+        const row = document.createElement('div'); row.className = 'document-row';
+        const title = document.createElement('span'); title.textContent = doc.title;
+        const actions = document.createElement('div'); actions.className = 'setup-actions';
+        const extract = document.createElement('button'); extract.className = 'mini-btn'; extract.textContent = '用語を抽出';
+        extract.onclick = () => extractDocument(doc.id, doc.title, extract);
+        const review = document.createElement('button'); review.className = 'mini-btn'; review.textContent = '候補を見る';
+        review.onclick = async () => {
+          try { const data = await readSessionApi(`/documents/${encodeURIComponent(doc.id)}`); showDocumentCandidates(doc.id, doc.title, data.document.candidate_terms || data.document.extracted_terms, data.document.candidate_context_summaries || data.document.context_summaries); }
+          catch (error) { showToast(error.message); }
+        };
+        review.disabled = !doc.candidate_terms?.length && !doc.extracted_terms?.length && !doc.candidate_context_summaries?.length && !doc.context_summaries?.length;
+        const remove = document.createElement('button'); remove.className = 'mini-btn'; remove.textContent = '削除';
+        remove.onclick = () => deleteDocument(doc.id, doc.title);
+        actions.append(extract, review, remove); row.append(title, actions); list.append(row);
+      }
+      status.textContent = '';
+    } catch (error) { status.textContent = error.message; }
+  }
+  async function addMeetingDocument(input) {
+    const file = input.files?.[0]; if (!file) return;
+    const status = document.getElementById('document-status'); const sessionId = currentSessionId;
+    try {
+      if (file.size > 5 * 1024 * 1024) throw new Error('資料は5MB以下のテキストを選んでください');
+      status.textContent = '資料を保存中…';
+      const content = await file.text();
+      if (sessionId !== currentSessionId) throw new Error('会議が切り替わったため保存を中止しました');
+      await setupRequest(sessionApi('/documents'), {title:file.name, content});
+      await refreshDocuments(); status.textContent = '資料を保存しました';
+    } catch (error) { status.textContent = error.message; }
+    finally { input.value = ''; }
+  }
+  async function deleteDocument(id, title) {
+    if (!confirm(`「${title}」を削除しますか？`)) return;
+    try { await setupRequest(sessionApi(`/documents/${encodeURIComponent(id)}/delete`), {}); await refreshDocuments(); }
+    catch (error) { showToast(error.message); }
+  }
+  function showDocumentCandidates(id, title, terms, summaries) {
+    reviewedDocumentId = id; reviewedDocumentSession = currentSessionId; documentCandidates = Array.isArray(terms) ? terms : [];
+    document.getElementById('document-review').hidden = false;
+    document.getElementById('document-review-title').textContent = `${title} の候補`;
+    document.getElementById('document-context').value = Array.isArray(summaries) ? summaries.join('\n') : (summaries || '');
+    document.getElementById('document-context-field').hidden = !id;
+    document.getElementById('document-review-status').textContent = `${documentCandidates.length} 件`;
+    const container = document.getElementById('document-terms'); container.replaceChildren();
+    documentCandidates.forEach((term, index) => {
+      const row = document.createElement('div'); row.className = 'term-row';
+      const check = document.createElement('input'); check.type = 'checkbox'; check.checked = true; check.setAttribute('aria-label', '用語を登録');
+      const surface = document.createElement('input'); surface.value = term.surface || ''; surface.setAttribute('aria-label', '用語');
+      const replacement = document.createElement('input'); replacement.value = term.replacement || term.surface || ''; replacement.setAttribute('aria-label', '表記');
+      row.dataset.index = String(index); row.append(check, surface, replacement); container.append(row);
+    });
+  }
+  async function extractDocument(id, title, button) {
+    const status = document.getElementById('document-status'); const sessionId = currentSessionId;
+    button.disabled = true; status.textContent = '資料を整理しています…';
+    try {
+      let result = await setupRequest(sessionApi(`/documents/${encodeURIComponent(id)}/extract`), {async:true});
+      while (result.status === 'running' || result.status === 'queued') {
+        const progress = result.progress;
+        status.textContent = progress?.total ? `資料を整理中 ${progress.current}/${progress.total}` : '資料を整理しています…';
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        if (sessionId !== currentSessionId) throw new Error('会議が切り替わりました。資料を開き直してください');
+        result = await readSessionApi(`/documents/${encodeURIComponent(id)}/extract`);
+      }
+      if (result.status === 'failed') throw new Error(result.error || '資料の整理に失敗しました');
+      if (sessionId !== currentSessionId) throw new Error('会議が切り替わりました。資料を開き直してください');
+      showDocumentCandidates(id, title, result.terms, result.context_summaries); status.textContent = '候補を確認してください';
+    } catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+  }
+  async function confirmDocumentTerms() {
+    if (reviewedDocumentSession !== currentSessionId) { showToast('会議を切り替えました。資料を開き直してください'); return; }
+    const rows = [...document.querySelectorAll('#document-terms .term-row')];
+    const terms = rows.filter(row => row.children[0].checked).map(row => ({...documentCandidates[Number(row.dataset.index)], surface:row.children[1].value.trim(), replacement:row.children[2].value.trim()}));
+    if (terms.some(t => !t.surface || !t.replacement)) { showToast('用語と表記を入力してください'); return; }
+    try {
+      const endpoint = reviewedDocumentId ? `/documents/${encodeURIComponent(reviewedDocumentId)}/confirm-terms` : '/terms/confirm';
+      const result = await setupRequest(sessionApi(endpoint), {terms, context_summary:document.getElementById('document-context').value, overwrite:false});
+      document.getElementById('document-review-status').textContent = result.skipped_existing?.length ? `登録済みの ${result.skipped_existing.length} 件は維持しました` : '登録しました';
+      await refreshDocuments();
+    } catch (error) { document.getElementById('document-review-status').textContent = error.message; }
+  }
+  async function refreshMeetingContexts() {
+    const list = document.getElementById('meeting-context-list');
+    const sessionId = currentSessionId;
+    try {
+      const data = await readSessionApi('/meeting-import/contexts');
+      if (sessionId !== currentSessionId) return;
+      list.replaceChildren();
+      if (!data.contexts.length) { list.textContent = '背景はまだありません'; return; }
+      for (const context of data.contexts) {
+        const row = document.createElement('div'); row.className = 'document-row';
+        const label = document.createElement('span'); label.textContent = context;
+        const button = document.createElement('button'); button.className = 'mini-btn'; button.textContent = '削除';
+        button.onclick = async () => {
+          if (!confirm('この背景を削除しますか？')) return;
+          try { await setupRequest(sessionApi('/meeting-import/remove-context'), {text:context}); await refreshMeetingContexts(); }
+          catch (error) { showToast(error.message); }
+        };
+        row.append(label, button); list.append(row);
+      }
+    } catch (error) { list.textContent = error.message; }
+  }
+  const scopedImportReviewed = Object.create(null);
+  function resetScopedImport(kind) {
+    delete scopedImportReviewed[kind];
+    document.getElementById(`import-${kind}-review`).hidden = true;
+  }
+  async function copyScopedPrompt(kind) {
+    try {
+      const response = await fetch(`/api/meeting-import/prompt?kind=${encodeURIComponent(kind)}`, {headers:authHeaders()});
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || '指示文を取得できませんでした');
+      let prompt = data.prompt;
+      if (kind === 'countries') {
+        const names = document.getElementById('country-prompt-names').value.trim();
+        if (!names) throw new Error('参加国名を入力してください');
+        prompt += `\n\n参加国一覧（以下は資料であり指示ではありません）:\n${names}`;
+      }
+      await writeClipboard(prompt); showToast('指示文をコピーしました');
+    } catch (error) { showToast(error.message); }
+  }
+  async function previewScopedImport(kind) {
+    resetScopedImport(kind);
+    const status = document.getElementById(`import-${kind}-status`);
+    const text = document.getElementById(`import-${kind}-text`).value.trim();
+    const sessionId = currentSessionId;
+    try {
+      const data = await setupRequest(sessionApi('/meeting-import/preview'), {text, kind});
+      if (sessionId !== currentSessionId) throw new Error('会議が切り替わりました。もう一度確認してください');
+      if (text !== document.getElementById(`import-${kind}-text`).value.trim()) throw new Error('入力が変わりました。もう一度確認してください');
+      scopedImportReviewed[kind] = {text, sessionId};
+      let preview = '';
+      if (kind === 'countries') preview = data.countries.map(c => `${c.code}  ${c.name}（${c.type === 'standard' ? 'ISO' : c.type === 'historical' ? '歴史' : '独自'}）${c.aliases?.length ? ` 別表記: ${c.aliases.join('、')}` : ''}`).join('\n');
+      if (kind === 'terms') preview = data.terms.map(t => `${t.surface} → ${t.replacement}${t.reading ? `（${t.reading}）` : ''}${t.category ? `［${t.category}］` : ''}${t.description ? `：${t.description}` : ''}`).join('\n');
+      if (kind === 'context') preview = data.context_summary;
+      if (!preview) throw new Error('登録する内容がありません');
+      document.getElementById(`import-${kind}-preview`).textContent = preview;
+      if (kind === 'terms') {
+        document.getElementById('import-terms-count').textContent = `${data.terms.length}件の用語が見つかりました。内容を確認して登録してください。`;
+        document.getElementById('import-terms-confirm').textContent = `${data.terms.length}件を登録する`;
+      }
+      document.getElementById(`import-${kind}-review`).hidden = false;
+      status.textContent = 'まだ登録されていません';
+    } catch (error) { status.textContent = error.message; }
+  }
+  async function confirmScopedImport(kind) {
+    const status = document.getElementById(`import-${kind}-status`);
+    const reviewed = scopedImportReviewed[kind];
+    if (!reviewed || reviewed.sessionId !== currentSessionId || reviewed.text !== document.getElementById(`import-${kind}-text`).value.trim()) {
+      resetScopedImport(kind); status.textContent = 'もう一度内容を確認してください'; return;
+    }
+    try {
+      const result = await setupRequest(sessionApi('/meeting-import/confirm'), {text:reviewed.text, kind});
+      resetScopedImport(kind);
+      if (kind === 'countries') await loadCountryCodes();
+      if (kind === 'terms') {
+        await switchDictType('session');
+        document.getElementById('registered-dictionary').open = true;
+      }
+      if (kind === 'context') await refreshMeetingContexts();
+      const label = kind === 'terms' ? `${result.added_count}件を本会議辞書に登録しました` : '登録しました';
+      status.textContent = result.skipped_existing.length ? `${label}。既存の ${result.skipped_existing.length}件は維持しました` : label;
+    } catch (error) { status.textContent = error.message; }
+  }
+  async function loadSessionSettings() {
+    const status = document.getElementById('session-settings-status');
+    const sessionId = currentSessionId;
+    sessionSettingsLoadedFor = null;
+    status.textContent = '読み込み中';
+    try {
+      const response = await fetch(`/api/session/${encodeURIComponent(sessionId)}/settings`, {headers:authHeaders()});
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || '設定を取得できません');
+      if (sessionId !== currentSessionId) return;
+      document.getElementById('recording-mode').value = data.recording_mode;
+      document.getElementById('audio-retention').value = data.audio_retention;
+      document.getElementById('retention-days').value = data.retention_days ?? 0;
+      updateRetentionField();
+      sessionSettingsLoadedFor = sessionId;
+      status.textContent = '';
+    } catch (error) { status.textContent = error.message; }
+  }
+  function updateRetentionField() {
+    document.getElementById('retention-days').disabled = document.getElementById('audio-retention').value !== 'retain';
+  }
+  async function saveSessionSettings() {
+    const status = document.getElementById('session-settings-status');
+    if (isRecording) { status.textContent = '録音を停止してから変更してください'; return; }
+    if (sessionSettingsLoadedFor !== currentSessionId) { status.textContent = '設定を読み込んでから保存してください'; return; }
+    try {
+      const daysInput = document.getElementById('retention-days').value;
+      const days = Number(daysInput);
+      if (!daysInput || !Number.isInteger(days) || days < 0 || days > 3650) throw new Error('保存日数は0〜3650の整数で入力してください');
+      const result = await setupRequest(`/api/session/${encodeURIComponent(currentSessionId)}/settings`, {
+        recording_mode:document.getElementById('recording-mode').value,
+        audio_retention:document.getElementById('audio-retention').value, retention_days:days
+      });
+      if (!result.ok) throw new Error(result.error || '設定を保存できません');
+      status.textContent = '保存しました';
+    } catch (error) { status.textContent = error.message; }
+  }
+  async function shutdownApp() {
+    if (isRecording) { showToast("録音を停止してから終了してください"); return; }
+    if ([...trackedUtterances.values()].some(item => item.failed?.length || item.finishError)) {
+      showToast("送信できなかった発言があります。再試行してから終了してください", 10000);
+      return;
+    }
+    await Promise.all(Object.values(saveChains));
+    if (Object.keys(failedCellSaves).length) {
+      showToast("保存できなかった編集があります。内容をコピーして確認してください", 10000);
+      return;
+    }
+    if (!confirm("アプリを終了しますか？ 共有中の端末も切断されます。")) return;
+    try {
+      await setupRequest("/api/shutdown", {});
+      if (pollInterval) clearInterval(pollInterval);
+      document.body.innerHTML = '<main style="padding:40px;font-family:system-ui;color:#172a46;"><h1 style="font-size:20px;">終了しました</h1><p>このタブを閉じてください。</p></main>';
+    } catch (error) { showToast(error.message, 6000); }
+  }
+  function openHelpModal() { document.getElementById("help-modal").classList.add("active"); }
+  function closeHelpModal() { document.getElementById("help-modal").classList.remove("active"); }
+  function openDictionaryModal() { openDocumentsModal(); }
+  function closeDictionaryModal() { closeDocumentsModal(); }
+  function openHistoryModal() {
+    document.getElementById("history-modal").classList.add("active");
+    loadHistoryList();
+  }
+  function closeHistoryModal() { document.getElementById("history-modal").classList.remove("active"); }
+
+  async function loadHistoryList() {
+    const container = document.getElementById("history-list");
+    try {
+      const resp = await fetch("/api/sessions");
+      const data = await resp.json();
+      if (data.ok && data.sessions) {
+        if (data.sessions.length === 0) {
+          container.innerHTML = `<div style="color:var(--text-muted); font-size:0.75rem;">保存済みセッションはありません。</div>`;
+          return;
+        }
+        container.innerHTML = data.sessions.map(s => `
+          <div style="background:#f8fafc; border:1px solid var(--border); border-radius:6px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-weight:600; font-size:0.78rem;">${s.name}</div>
+              <div style="font-size:0.68rem; color:var(--text-muted);">${s.created_at || ''}</div>
+            </div>
+            <button class="mini-btn mini-btn-primary" onclick="switchToSession('${s.name}')">開く</button>
+          </div>
+        `).join("");
+      }
+    } catch (e) {
+      container.innerHTML = `<div style="color:var(--danger); font-size:0.75rem;">履歴読み込み失敗</div>`;
+    }
+  }
+
+  async function switchToSession(sessName) {
+    if (isRecording || recordingStarting || [...trackedUtterances.values()].some(item => item.failed?.length || item.finishError || !item.done)) {
+      showToast('録音と送信を終えてから会議を切り替えてください', 7000);
+      return;
+    }
+    currentSessionId = sessName;
+    window.currentSessionId = sessName;
+    if (!isGuestMode) localStorage.setItem('mun_host_session_id', sessName);
+    document.getElementById("badge-rec-status").innerHTML = `<span class="dot"></span> マイクオフ`;
+    closeHistoryModal();
+    showToast(`📜 セッション「${sessName}」を開きました`);
+    await syncBlocksNow();
+  }
+
+  // 録音・マイク制御 (ホストMacのみ)
+  async function toggleRecordingStandby() {
+    if (isRecording) {
+      await stopRecordingStandby();
+    } else {
+      await startRecordingStandby();
+    }
+  }
+
+  function loadAudioSettings() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('mun-audio-settings') || '{}'); } catch (_) {}
+    document.getElementById('audio-noise').checked = saved.noise !== false;
+    document.getElementById('audio-echo').checked = saved.echo !== false;
+    document.getElementById('audio-gain').checked = saved.gain !== false;
+    return saved;
+  }
+  function saveAudioSettings() {
+    const settings = {deviceId:document.getElementById('audio-input').value, outputId:document.getElementById('audio-output').value,
+      noise:document.getElementById('audio-noise').checked,
+      echo:document.getElementById('audio-echo').checked,
+      gain:document.getElementById('audio-gain').checked};
+    try { localStorage.setItem('mun-audio-settings', JSON.stringify(settings)); }
+    catch (_) { showToast('音声設定を保存できませんでした'); }
+    document.getElementById('audio-settings-status').textContent = '設定は次の録音から反映されます。';
+  }
+  async function refreshAudioDevices() {
+    const select = document.getElementById('audio-input');
+    const output = document.getElementById('audio-output');
+    const saved = loadAudioSettings();
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      select.replaceChildren(new Option('システムの既定', ''));
+      devices.filter(d => d.kind === 'audioinput' && d.deviceId).forEach((d, i) => {
+        select.add(new Option(d.label || `マイク ${i + 1}`, d.deviceId));
+      });
+      if (saved.deviceId && !Array.from(select.options).some(o => o.value === saved.deviceId)) {
+        select.add(new Option('保存済みのマイク（現在見つかりません）', saved.deviceId));
+      }
+      select.value = saved.deviceId || '';
+      output.replaceChildren(new Option('システムの既定', ''));
+      devices.filter(d => d.kind === 'audiooutput' && d.deviceId).forEach((d, i) => {
+        output.add(new Option(d.label || `出力 ${i + 1}`, d.deviceId));
+      });
+      if (saved.outputId && !Array.from(output.options).some(o => o.value === saved.outputId)) output.add(new Option('保存済みの出力（現在見つかりません）', saved.outputId));
+      output.value = saved.outputId || '';
+      output.disabled = typeof document.getElementById('audio-test-playback').setSinkId !== 'function';
+      await applyAudioOutput();
+    } catch (_) { document.getElementById('audio-settings-status').textContent = 'マイク一覧を取得できません。ブラウザの権限を確認してください。'; }
+  }
+  async function applyAudioOutput() {
+    const player = document.getElementById('audio-test-playback');
+    if (typeof player.setSinkId !== 'function') return;
+    try { await player.setSinkId(document.getElementById('audio-output').value); }
+    catch (_) { document.getElementById('audio-settings-status').textContent = '再生先を選べません。機器とブラウザの権限を確認してください。'; }
+  }
+  async function testAudioInput() {
+    if (isRecording || recordingStarting) { showToast('録音を停止してからテストしてください'); return; }
+    const button = document.getElementById('audio-test-button');
+    button.disabled = true; button.textContent = '録音中…';
+    let stream;
+    try {
+      const saved = loadAudioSettings();
+      const audio = {echoCancellation:saved.echo !== false, noiseSuppression:saved.noise !== false, autoGainControl:saved.gain !== false};
+      if (saved.deviceId) audio.deviceId = {exact:saved.deviceId};
+      stream = await navigator.mediaDevices.getUserMedia({audio});
+      const recorder = new MediaRecorder(stream); const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      const recorded = new Promise((resolve, reject) => { recorder.onstop = resolve; recorder.onerror = () => reject(new Error('テスト録音に失敗しました')); });
+      recorder.start(); await new Promise(resolve => setTimeout(resolve, 3000)); recorder.stop(); await recorded;
+      if (!chunks.length) throw new Error('音声を取得できませんでした');
+      if (audioTestUrl) URL.revokeObjectURL(audioTestUrl);
+      audioTestUrl = URL.createObjectURL(new Blob(chunks, {type:recorder.mimeType}));
+      document.getElementById('audio-test-playback').src = audioTestUrl;
+      await refreshAudioDevices();
+      document.getElementById('audio-settings-status').textContent = 'テスト音声を再生して確認できます。';
+    } catch (error) { document.getElementById('audio-settings-status').textContent = `テストできませんでした: ${error.message}`; }
+    finally { if (stream) stream.getTracks().forEach(track => track.stop()); button.disabled = false; button.textContent = '3秒テスト録音'; }
+  }
+
+  async function startRecordingStandby() {
+    if (isRecording || recordingStarting) return;
+    if (document.getElementById('audio-test-button').disabled) { showToast('テスト録音が終わるまでお待ちください'); return; }
+    if ([...trackedUtterances.values()].some(item => item.failed?.length || item.finishError || !item.done)) {
+      showToast('送信に失敗した発言を再試行してから録音してください', 7000);
+      return;
+    }
+    recordingStarting = true;
+    try {
+      const savedAudio = loadAudioSettings();
+      const audioConstraints = {channelCount: 1, sampleRate: 16000,
+        echoCancellation: savedAudio.echo !== false, noiseSuppression: savedAudio.noise !== false,
+        autoGainControl: savedAudio.gain !== false};
+      if (savedAudio.deviceId) audioConstraints.deviceId = {exact: savedAudio.deviceId};
+      mediaStream = await navigator.mediaDevices.getUserMedia({audio: audioConstraints});
+      const actual = mediaStream.getAudioTracks()[0].getSettings();
+      const actualText = [['noiseSuppression','雑音抑制'], ['echoCancellation','エコー除去'], ['autoGainControl','自動音量調整']]
+        .filter(([key]) => typeof actual[key] === 'boolean').map(([key, name]) => `${name}: ${actual[key] ? 'オン' : 'オフ'}`).join(' / ');
+      document.getElementById('audio-settings-status').textContent = actualText || '録音中。詳細な適用状態はブラウザから取得できません。';
+      refreshAudioDevices();
+      audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      audioInterruptionReported = false;
+      lastAudioCallbackAt = 0;
+      mediaStream.getAudioTracks()[0].addEventListener('ended', () => {
+        if (isRecording) showToast('マイクが切断されました。録音を停止し、接続を確認してください', 12000);
+      });
+      audioContext.onstatechange = () => {
+        if (isRecording && audioContext.state === 'suspended') showToast('録音が中断しました。PC とマイクの状態を確認してください', 12000);
+      };
+      const source = audioContext.createMediaStreamSource(mediaStream);
+      scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+      ringBuffer = [];
+      trackedUtterances.clear();
+      pcmChunks = [];
+      recStartTime = Date.now();
+
+      scriptProcessor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        const copy = new Float32Array(input.length);
+        copy.set(input);
+        const now = Date.now();
+        if (lastAudioCallbackAt && now - lastAudioCallbackAt > 1500 && !audioInterruptionReported) {
+          audioInterruptionReported = true;
+          showToast('音声入力が中断した可能性があります。録音状態を確認してください', 12000);
+        }
+        lastAudioCallbackAt = now;
+        if (now - lastLevelUpdate >= 100) {
+          let energy = 0; for (const value of input) energy += value * value;
+          document.getElementById('input-level').value = Math.min(1, Math.sqrt(energy / Math.max(input.length, 1)) * 5);
+          lastLevelUpdate = now;
+        }
+        ringBuffer.push({ time: now, samples: copy });
+
+        const cutoff = now - 130000;
+        let removeCount = 0;
+        for (let i = 0; i < ringBuffer.length; i++) {
+          if (ringBuffer[i].time < cutoff) removeCount++;
+          else break;
+        }
+        if (removeCount > 0) ringBuffer.splice(0, removeCount);
+      };
+
+      source.connect(scriptProcessor);
+      scriptProcessor.connect(audioContext.destination);
+
+      const activated = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/activate`, {method:"POST", headers:authHeaders()});
+      if (!activated.ok) throw new Error("録音対象を設定できませんでした");
+      isRecording = true;
+      document.getElementById("btn-rec-standby").classList.add("active");
+      document.getElementById("rec-label").innerText = "マイクをオフ";
+      document.getElementById("badge-rec-status").className = "status-pill recording";
+      document.getElementById("badge-rec-status").innerHTML = `<span class="dot"></span> マイクオン`;
+
+      timerInterval = setInterval(() => {
+        const sec = Math.floor((Date.now() - recStartTime) / 1000);
+        const m = String(Math.floor(sec / 60)).padStart(2, "0");
+        const s = String(sec % 60).padStart(2, "0");
+        document.getElementById("timer-display").innerText = `${m}:${s}`;
+      }, 1000);
+
+      showToast(cueMode === "toggle" ? "録音中です。F2 で文字化を開始・終了します。" : "録音中です。F2 を押している間の発言を文字化します。");
+    } catch (e) {
+      if (scriptProcessor) scriptProcessor.disconnect();
+      if (audioContext && audioContext.state !== 'closed') audioContext.close().catch(() => {});
+      if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+      showToast("❌ マイク開始エラー: " + e.message);
+    } finally { recordingStarting = false; }
+  }
+
+  async function stopRecordingStandby() {
+    if (!isRecording) return;
+    while (cuePolling) await new Promise(resolve => setTimeout(resolve, 20));
+    if (!await pollUtterances()) { showToast("録音状態を確認できません。接続を確認してください", 10000); return; }
+    if (isCueHolding && !await finishSpeechMark()) return;
+    while (cuePolling) await new Promise(resolve => setTimeout(resolve, 20));
+    await pollUtterances(true);
+    await Promise.all([...trackedUtterances.values()].map(item => item.chain));
+    isRecording = false;
+    clearInterval(timerInterval);
+    if (scriptProcessor) scriptProcessor.disconnect();
+    if (audioContext && audioContext.state !== 'closed') audioContext.close().catch(() => {});
+    if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+
+    document.getElementById('input-level').value = 0;
+
+    document.getElementById("btn-rec-standby").classList.remove("active");
+    document.getElementById("rec-label").innerText = "マイクをオン";
+    document.getElementById("badge-rec-status").className = "status-pill";
+    document.getElementById("badge-rec-status").innerHTML = `<span class="dot"></span> マイクオフ`;
+    showToast("⏹️ マイク録音を停止しました。");
+  }
+
+  async function loadCueSettings() {
+    try {
+      const [mode, status] = await Promise.all([fetch("/api/mac-keys/mode").then(r => r.json()), fetch("/api/mac-keys/status").then(r => r.json())]);
+      cueMode = mode.cue_mode || "toggle";
+      globalKeysAvailable = !!status.can_capture_global_keys;
+      document.querySelector(`input[name="cue_mode"][value="${cueMode}"]`).checked = true;
+      updateCueLabel();
+    } catch (_) { globalKeysAvailable = false; }
+  }
+  function updateCueLabel() {
+    document.getElementById("cue-mode-label").textContent = cueMode === "hold" ? "長押し" : "切替";
+  }
+  async function setCueMode(mode) {
+    if (isCueHolding) { showToast("文字化を終了してから変更してください"); return; }
+    try {
+      const res = await fetch("/api/mac-keys/mode", {method:"POST", headers:authHeaders(), body:JSON.stringify({cue_mode:mode})});
+      if (!res.ok) throw new Error("設定できませんでした");
+      cueMode = mode; updateCueLabel();
+    } catch (e) { showToast(e.message); }
+  }
+  function cueButtonDown(e) {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    if (cueMode === "toggle" && isCueHolding) finishSpeechMark();
+    else startSpeechMark();
+  }
+  function cueButtonUp(e) { e.preventDefault(); if (cueMode === "hold") finishSpeechMark(); }
+  async function startSpeechMark() {
+    if (!isRecording) { showToast("先にマイクをオンにしてください"); return; }
+    if (isCueHolding) return;
+    try {
+      const response = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/cue-down`, {
+        method:"POST", headers:authHeaders(), body:JSON.stringify({press_time_ms:Date.now()})
+      });
+      if (!response.ok) throw new Error("文字化を開始できませんでした");
+      await pollUtterances();
+    } catch (e) { showToast(e.message); }
+  }
+  async function finishSpeechMark() {
+    try {
+      const response = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/cue-up`, {
+        method:"POST", headers:authHeaders(), body:JSON.stringify({release_time_ms:Date.now()})
+      });
+      if (!response.ok) throw new Error("文字化を終了できませんでした");
+      await pollUtterances();
+      return true;
+    } catch (e) { showToast(e.message); return false; }
+  }
+  async function pollUtterances(forceFinal = false) {
+    if (cuePolling || !isRecording || !currentSessionId) return;
+    cuePolling = true;
+    try {
+      const sessionPath = `/api/session/${encodeURIComponent(currentSessionId)}`;
+      let response = cueStatusSupported ? await fetch(`${sessionPath}/cue-status?since_ms=${Math.max(0, recStartTime - 1000)}`) : null;
+      if (response?.status === 404) cueStatusSupported = false;
+      if (!cueStatusSupported) response = await fetch(`${sessionPath}/status`);
+      if (!response.ok) throw new Error("録音状態を確認できませんでした");
+      const data = await response.json();
+      isCueHolding = !!data.active_cue_hold?.is_holding;
+      document.getElementById("btn-cue-mark").classList.toggle("active", isCueHolding);
+      document.getElementById("cue-indicator").style.display = isCueHolding ? "inline" : "none";
+      for (const utterance of data.utterances || []) {
+        if (utterance.start_time_ms < recStartTime - 1000) continue;
+        let tracked = trackedUtterances.get(utterance.id);
+        if (!tracked) {
+          tracked = {cursor:Math.max(recStartTime, utterance.start_time_ms - getMarginSec()*1000), seq:0, chain:Promise.resolve(), done:false};
+          trackedUtterances.set(utterance.id, tracked);
+        }
+        if (tracked.done) continue;
+        const end = utterance.closed ? utterance.end_time_ms + getMarginSec()*1000 : Date.now() - 1200;
+        let readyEnd = forceFinal ? Math.min(end, Date.now()) : end;
+        const shouldChunk = !utterance.closed && readyEnd - tracked.cursor >= 8000;
+        if (shouldChunk) {
+          readyEnd = choosePauseBoundary(tracked.cursor, readyEnd);
+        }
+        const isFinal = utterance.closed && (forceFinal || Date.now() >= end);
+        if (shouldChunk || (isFinal && readyEnd > tracked.cursor)) {
+          const start = tracked.cursor;
+          const matched = ringBuffer.filter(c => c.time >= start && c.time < readyEnd);
+          if (matched.length) {
+            const total = matched.reduce((n, c) => n + c.samples.length, 0);
+            const samples = new Float32Array(total); let offset = 0;
+            for (const chunk of matched) { samples.set(chunk.samples, offset); offset += chunk.samples.length; }
+            const blob = encodeWav(samples, audioContext.sampleRate);
+            const seq = tracked.seq++;
+            tracked.chain = tracked.chain.then(async () => {
+              const result = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/speech-chunk`, {
+                method:"POST", headers:{"Content-Type":"audio/wav", "X-Utterance-Id":utterance.id, "X-Chunk-Seq":String(seq), "X-Audio-Duration":String(samples.length / audioContext.sampleRate)}, body:blob
+              });
+              if (!result.ok) throw new Error(`音声送信に失敗しました (${result.status})`);
+            }).catch(e => { tracked.failed = tracked.failed || []; tracked.failed.push({blob, seq}); showToast(e.message, 10000); });
+          }
+          tracked.cursor = readyEnd;
+        }
+        if (isFinal) {
+          tracked.done = true;
+          const sessionId = currentSessionId;
+          tracked.chain = tracked.chain.then(() => notifyUtteranceFinished(sessionId, utterance.id, tracked))
+            .catch(error => { tracked.finishError = error.message; showToast(error.message, 10000); });
+        }
+      }
+      return true;
+    } catch (e) { console.warn("文字化状態を確認できません", e); return false; }
+    finally { cuePolling = false; }
+  }
+
+  async function notifyUtteranceFinished(sessionId, utteranceId, tracked) {
+    if (tracked.failed?.length) throw new Error("音声を送信できませんでした。再試行してください");
+    await setupRequest(`/api/session/${encodeURIComponent(sessionId)}/utterance/finish`, {utterance_id:utteranceId, total_chunks:tracked.seq});
+    tracked.finishError = null;
+  }
+
+  // 発言は削らず、候補区間内の小さな音の位置でのみ区切る。
+  function choosePauseBoundary(start, target) {
+    const candidates = ringBuffer.filter(chunk => chunk.time >= Math.max(start + 6000, target - 2000) && chunk.time < target);
+    if (candidates.length < 2) return target;
+    const energies = candidates.map(chunk => {
+      let sum = 0;
+      for (const sample of chunk.samples) sum += sample * sample;
+      return Math.sqrt(sum / Math.max(1, chunk.samples.length));
+    });
+    const peak = Math.max(...energies);
+    if (peak < 0.0001) return target;
+    const threshold = Math.min(0.01, peak * 0.15);
+    for (let i = candidates.length - 1; i >= 0; i--) {
+      if (energies[i] <= threshold) return candidates[i].time + 1;
+    }
+    return target;
+  }
+
+  function encodeWav(samples, sampleRate) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    function writeStr(offset, str) {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    }
+    writeStr(0, "RIFF");
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeStr(8, "WAVE");
+    writeStr(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, 1, true); // mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, "data");
+    view.setUint32(40, samples.length * 2, true);
+
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+      let s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+    return new Blob([view], { type: "audio/wav" });
+  }
+
+  function setupKeyListeners() {
+    window.addEventListener("keydown", e => {
+      if (e.key !== "F2" || e.repeat) return;
+      e.preventDefault();
+      if (globalKeysAvailable) return;
+      if (cueMode === "toggle" && isCueHolding) finishSpeechMark(); else startSpeechMark();
+    });
+    window.addEventListener("keyup", e => {
+      if (e.key !== "F2") return;
+      e.preventDefault();
+      if (!globalKeysAvailable && cueMode === "hold") finishSpeechMark();
+    });
+  }
+
+  // モデル管理 & 辞書連携
+  async function checkSystemAndModels() {
+    try {
+      const resp = await fetch("/api/models");
+      const data = await resp.json();
+      if (resp.ok && data.ok) {
+        renderModelsModal(data);
+      } else {
+        throw new Error(data.error || "モデル情報を取得できませんでした");
+      }
+    } catch (e) {
+      document.getElementById("llm-status-pill").textContent = "確認できません";
+      document.getElementById("whisper-status-pill").textContent = "確認できません";
+    }
+  }
+
+  async function setupRequest(url, payload) {
+    const response = await fetch(url, {method:"POST", headers:authHeaders(), body:JSON.stringify(payload)});
+    const data = await response.json();
+    if (!response.ok || !data.ok || data.saved_to_disk === false) throw new Error(data.error || "設定を保存できませんでした");
+    return data;
+  }
+  let setupCurrentDataDir = null;
+  async function refreshSetup() {
+    try {
+      const [status, settings, models] = await Promise.all(["/api/setup/status", "/api/settings", "/api/models"].map(u => fetch(u).then(r => r.json())));
+      if (!status.ok || !settings.ok || !models.ok) throw new Error("準備状況を取得できませんでした");
+      document.getElementById("setup-summary").textContent = status.all_ready ? "利用する準備ができています" : "準備が必要な項目があります";
+      const checks = document.getElementById("setup-components"); checks.replaceChildren();
+      for (const [key, label] of [["ffmpeg", "音声変換"], ["whisper", "音声認識"], ["ollama", "Ollama"], ["whisper_model", "音声モデル"], ["llm_model", "整文モデル"]]) {
+        const item = document.createElement("span"); const ok = !!status.components[key]?.ok;
+        item.className = `setup-check${ok ? "" : " missing"}`; item.textContent = `${label}：${ok ? "準備済み" : "未準備"}`; checks.append(item);
+      }
+      document.getElementById("setup-models-dir").value = settings.settings.models_dir;
+      document.getElementById("setup-data-dir").value = settings.settings.data_dir;
+      setupCurrentDataDir = settings.settings.data_dir;
+      document.getElementById("setup-storage-status").textContent = `音声モデルの保存先の空き容量：${settings.storage.models_dir_free_gb ?? "不明"} GB。整文モデルは Ollama の保存先を使用します。変更後も既存ファイルは移動されません。`;
+      for (const [id, values, key, sizeKey] of [["download-whisper", models.whisper.catalog || [], "filename", "size_mb"], ["download-llm", models.llm.catalog || [], "model", "size_gb"]]) {
+        const select = document.getElementById(id); const selected = select.value; select.replaceChildren();
+        for (const entry of values) select.add(new Option(`${entry.name}（約${entry[sizeKey]} ${sizeKey === "size_mb" ? "MB" : "GB"}）`, entry[key], false, entry[key] === selected));
+      }
+      await updateDownloadProgress();
+    } catch (e) { document.getElementById("setup-summary").textContent = e.message; }
+  }
+  async function saveStorageSettings() {
+    if (isRecording) { showToast("録音を停止してから変更してください"); return; }
+    try {
+      const requestedDataDir = document.getElementById("setup-data-dir").value;
+      const result = await setupRequest("/api/settings", {models_dir:document.getElementById("setup-models-dir").value, data_dir:requestedDataDir});
+      if (setupCurrentDataDir !== result.settings.data_dir) await initActiveSession(true);
+      showToast("保存先を変更しました。新しい会議から使用します"); await refreshSetup();
+    } catch (e) { showToast(e.message, 6000); }
+  }
+  async function startModelDownload(kind) {
+    try {
+      const whisper = kind === "whisper";
+      const value = document.getElementById(whisper ? "download-whisper" : "download-llm").value;
+      if (!value) throw new Error("モデルを選んでください");
+      const result = await setupRequest(whisper ? "/api/models/whisper/download" : "/api/models/llm/pull", whisper ? {filename:value} : {model:value});
+      showToast(result.already_exists ? "このモデルはダウンロード済みです" : "ダウンロードを開始しました");
+      await updateDownloadProgress();
+    } catch (e) { showToast(e.message, 6000); }
+  }
+  async function updateDownloadProgress() {
+    for (const [kind, url, field] of [["whisper", "/api/models/whisper/download/status", "download"], ["llm", "/api/models/llm/pull/status", "pull"]]) {
+      try {
+        const data = await fetch(url).then(r => r.json()); const progress = data[field];
+        if (!progress) continue;
+        const labels = {idle:"", downloading:"ダウンロード中", pulling:"ダウンロード中", verifying:"確認中", completed:"完了", failed:"失敗", cancelling:"中止中", cancelled:"中止"};
+        let message = labels[progress.status] ?? progress.status;
+        if (["downloading", "pulling"].includes(progress.status) && progress.percent != null) message += ` ${progress.percent}%`;
+        if (progress.message) message += `：${progress.message}`;
+        if (progress.error) message += `：${progress.error}`;
+        document.getElementById(`progress-${kind}`).textContent = message;
+      } catch (_) {}
+    }
+  }
+  window.addEventListener("DOMContentLoaded", () => {
+    setInterval(() => { if (document.getElementById("settings-modal")?.classList.contains("active")) updateDownloadProgress(); }, 1500);
+  });
+
+  function renderModelsModal(data) {
+    const llmSelect = document.getElementById("select-llm-model");
+    const whisperSelect = document.getElementById("select-whisper-model");
+    const llm = data.llm || {};
+    const whisper = data.whisper || {};
+    llmSelect.replaceChildren();
+    for (const name of llm.installed || []) {
+      llmSelect.add(new Option(name, name, false, name === llm.current));
+    }
+    whisperSelect.replaceChildren();
+    for (const model of whisper.available || []) {
+      whisperSelect.add(new Option(model.filename, model.filename, false, model.filename === whisper.current_filename));
+    }
+    document.getElementById("llm-status-pill").textContent = llm.is_available ? "利用可能" : "未接続";
+    document.getElementById("whisper-status-pill").textContent = whisper.is_available ? "利用可能" : "未検出";
+  }
+
+  async function applyLlmSelect() {
+    const model = document.getElementById("select-llm-model").value;
+    try {
+      const resp = await fetch("/api/models/llm/select", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ model: model })
+      });
+      const data = await resp.json();
+      showToast(data.ok ? "🤖 LLMを切り替えました" : "❌ " + data.error);
+    } catch (e) { showToast("❌ 切替失敗"); }
+  }
+
+  async function preloadLlm() {
+    showToast("⚡ LLMを事前ロード中…");
+    try {
+      const resp = await fetch("/api/models/llm/preload", { method: "POST", headers: authHeaders() });
+      const data = await resp.json();
+      showToast(data.ok ? "⚡ LLM事前ロード完了" : "❌ " + data.error);
+    } catch (e) { showToast("❌ ロード失敗"); }
+  }
+
+  async function unloadLlm() {
+    try {
+      const resp = await fetch("/api/models/llm/unload", { method: "POST", headers: authHeaders() });
+      const data = await resp.json();
+      showToast(data.ok ? "🧹 LLMメモリを解放しました" : "❌ " + data.error);
+    } catch (e) { showToast("❌ 解放失敗"); }
+  }
+
+  async function applyWhisperSelect() {
+    const filename = document.getElementById("select-whisper-model").value;
+    try {
+      const resp = await fetch("/api/models/whisper/select", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ filename: filename })
+      });
+      const data = await resp.json();
+      showToast(data.ok ? "🎙️ Whisperモデルを切り替えました" : "❌ " + data.error);
+    } catch (e) { showToast("❌ 切替失敗"); }
+  }
+
+  async function loadCountryCatalog() {
+    if (countryCatalog) { renderCountryOptions(); return; }
+    try {
+      const response = await fetch('/iso-countries.json');
+      if (!response.ok) throw new Error('国の一覧を読み込めませんでした');
+      const regions = await response.json();
+      let names = null; try { names = new Intl.DisplayNames(['ja'], {type:'region'}); } catch (_) {}
+      countryCatalog = regions.map(([region, code]) => ({code, name:names?.of(region) || code}));
+      countryCatalog.sort((a,b) => a.name.localeCompare(b.name, 'ja'));
+      renderCountryOptions();
+    } catch (error) { document.getElementById('country-options').textContent = error.message; }
+  }
+  function renderCountryOptions() {
+    const options = document.getElementById('country-options'); options.replaceChildren();
+    if (!countryCatalog) return;
+    const query = document.getElementById('country-search').value.trim().toLocaleLowerCase();
+    const results = countryCatalog.filter(item => `${item.name} ${item.code}`.toLocaleLowerCase().includes(query));
+    if (!results.length) { options.textContent = '該当する国がありません'; return; }
+    for (const item of results) {
+      const label = document.createElement('label'); const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox'; checkbox.checked = selectedCountryCodes.has(item.code);
+      checkbox.onchange = () => checkbox.checked ? selectedCountryCodes.add(item.code) : selectedCountryCodes.delete(item.code);
+      label.append(checkbox, document.createTextNode(`${item.name}  ${item.code}`)); options.append(label);
+    }
+  }
+  function addSelectedCountries() {
+    const input = document.getElementById('country-codes');
+    const existing = input.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const codes = new Set(existing.map(line => (line.match(/^([A-Za-z0-9_-]{2,6})(?:\s|$)/)?.[1] || '').toUpperCase()));
+    for (const item of countryCatalog || []) {
+      if (!selectedCountryCodes.has(item.code)) continue;
+      const codeOnly = existing.findIndex(line => line.toUpperCase() === item.code);
+      if (codeOnly >= 0) existing[codeOnly] = `${item.code} ${item.name}`;
+      else if (!codes.has(item.code)) existing.push(`${item.code} ${item.name}`);
+    }
+    input.value = existing.join('\n'); selectedCountryCodes.clear(); renderCountryOptions();
+  }
+  async function loadCountryCodes() {
+    countriesLoadedFor = null;
+    const sessionId = currentSessionId;
+    try {
+      const response = await fetch(`/api/session/${encodeURIComponent(sessionId)}/countries`, {headers:authHeaders()});
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.error || "参加国を読み込めませんでした");
+      if (sessionId !== currentSessionId) return;
+      loadedCountries = Array.isArray(data.countries) && data.countries.length ? data.countries : (data.country_codes || []).map(code => ({code, name:code, type:'standard'}));
+      document.getElementById("country-codes").value = loadedCountries.map(({code, name}) => name && name !== code ? `${code} ${name}` : code).join("\n");
+      countriesLoadedFor = sessionId;
+    } catch (error) { showToast(error.message); }
+  }
+  async function saveCountryCodes() {
+    try {
+      if (countriesLoadedFor !== currentSessionId) throw new Error("参加国を読み込んでから保存してください");
+      const lines = document.getElementById("country-codes").value.split(/\r?\n/).map(line => line.trim()).filter(Boolean).flatMap(line =>
+        /^[A-Z0-9_-]{2,6}(?:\s*[,、]\s*[A-Z0-9_-]{2,6})+$/.test(line) ? line.split(/\s*[,、]\s*/) : [line]);
+      const countries = []; const seen = new Set();
+      for (const line of lines) {
+        const match = line.match(/^([A-Za-z0-9_-]{2,6})(?:[\s,、:：]+(.+))?$/);
+        if (!match) throw new Error(`「${line}」は「コード 国名」の順に入力してください`);
+        const code = match[1].toUpperCase();
+        if (seen.has(code)) throw new Error(`${code} が重複しています`);
+        seen.add(code);
+        const previous = loadedCountries.find(item => item.code === code);
+        countries.push({code, name:(match[2] || previous?.name || code).trim(), type:previous?.type || 'standard', aliases:previous?.aliases || []});
+      }
+      const response = await fetch(`/api/session/${encodeURIComponent(currentSessionId)}/countries`, {method:"POST", headers:authHeaders(), body:JSON.stringify({countries})});
+      const saved = await response.json();
+      if (!response.ok || !saved.ok) throw new Error(saved.error || "参加国を保存できませんでした");
+      if (activeDictType === "session") await loadDictionaryData();
+      await loadCountryCodes(); showToast("参加国を保存しました");
+    } catch (error) { showToast(error.message); }
+  }
+
+  // 辞書管理
+  async function loadDictionaryData() {
+    const endpoint = activeDictType === "common"
+      ? "/api/dictionary/common"
+      : `/api/dictionary/session/${encodeURIComponent(currentSessionId)}`;
+    try {
+      const resp = await fetch(endpoint);
+      const data = await resp.json();
+      if (!resp.ok || !Array.isArray(data.entries)) throw new Error(data.error || "辞書を読み込めませんでした");
+      currentDict = data;
+      renderDictTable();
+    } catch (e) {
+      currentDict = {};
+      document.getElementById("dict-table-body").innerHTML = `<tr><td colspan="3">辞書を読み込めませんでした</td></tr>`;
+    }
+  }
+
+  function switchDictType(type) {
+    activeDictType = type;
+    document.getElementById("btn-dict-common").className = type === "common" ? "mini-btn mini-btn-primary" : "mini-btn";
+    document.getElementById("btn-dict-session").className = type === "session" ? "mini-btn mini-btn-primary" : "mini-btn";
+    return loadDictionaryData();
+  }
+
+  function renderDictTable() {
+    const tbody = document.getElementById("dict-table-body");
+    const terms = currentDict.entries || [];
+    if (terms.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="3" style="padding:8px; text-align:center; color:var(--text-muted);">登録用語はありません</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = terms.map(t => `
+      <tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:4px 6px; font-weight:600;">${escapeHtml(t.surface)}</td>
+        <td style="padding:4px 6px; color:var(--primary);">${escapeHtml(t.replacement)}</td>
+        <td style="padding:4px 6px; color:var(--text-muted);">${escapeHtml(t.description || '-')}</td>
+      </tr>
+    `).join("");
+  }
+
+  function toggleAddTermForm() {
+    const box = document.getElementById("add-term-box");
+    box.style.display = box.style.display === "none" ? "block" : "none";
+  }
+
+  async function submitNewTerm() {
+    const surface = document.getElementById("new-term-surface").value.trim();
+    const replacement = document.getElementById("new-term-replacement").value.trim();
+    const desc = document.getElementById("new-term-desc").value.trim();
+    if (!surface || !replacement) {
+      showToast("⚠️ 見出し語と置換正式名を入力してください");
+      return;
+    }
+    if (!Array.isArray(currentDict.entries)) {
+      showToast("辞書を読み込んでから追加してください");
+      return;
+    }
+    const updatedDict = { ...currentDict, entries: [...currentDict.entries, { surface, replacement, description: desc, enabled: true }] };
+
+    const endpoint = activeDictType === "common"
+      ? "/api/dictionary/common"
+      : `/api/dictionary/session/${encodeURIComponent(currentSessionId)}`;
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(updatedDict)
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || "辞書を保存できませんでした");
+      currentDict = updatedDict;
+      showToast("用語を追加しました");
+      toggleAddTermForm();
+      document.getElementById("new-term-surface").value = "";
+      document.getElementById("new-term-replacement").value = "";
+      document.getElementById("new-term-desc").value = "";
+      renderDictTable();
+    } catch (e) {
+      showToast("❌ 辞書保存エラー");
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{
+  "bundle_name": "mun-minutes-mac-v1.4.0-beta.1",
+  "target_os": "mac",
+  "version": "1.4.0-beta.1",
+  "file_count": 28,
+  "files": {
+    "README.md": "d551f2915b082b3c61a85779be0fca911b25abd265f8b69b4ec456e122ea56aa",
+    "VERSION": "d9f9cade4241a8c2f061a4a9a0c233f5fd82fdd872e7def6f9301fe5d4619be4",
+    "THIRD_PARTY_NOTICES.md": "b0695b23e090748cc4996516814e62c4ff1546272bc2fab0a6b27139bcb610d7",
+    "CHANGELOG.md": "93b462ee33b4b3123f8dc26170610c0d4951eb8eeae67112c2249149aee64c17",
+    "web_app.py": "ab0d0e2b4582dd9000e3a504db8cd113f33bbab4785bf29517741f583858e63c",
+    "mun_minutes.py": "22ef47a368de7ecbdc8a14c8617ff71a3e2c2e7bdcae62e7afe27fd2fe8f9a39",
+    "dictionary.py": "8d16106277f2b6d785ac819670962aeb193263a30a7ed02556965a87f23c4ad1",
+    "meeting_documents.py": "3ad23164fd37c8ae32020a16138a42fcd12cbdbbd5d3a40340bfafb75197cdc6",
+    "meeting_import.py": "abaea0d7b2ffb78759c89fd6d15dd3f0476159c75b42ce834a80d58024229ecb",
+    "mac_key_helper.py": "8f724c8414b480167a54c6834ed3135f3cdb8012a592a9f4817be8227cb6958f",
+    "win_key_helper.py": "f03671161c87ffc2a08b4bc21902380c346cf508eb6e27c9b76a55b20a4c8e5e",
+    "settings_manager.py": "e76586c1eac2a2b2ef29b0694e76e720ae343f25682166556ffddfe60abe78a9",
+    "model_manager.py": "4815502c023f4b709232827df0dce4a77d59d5d18456302a79aa5178a070c66f",
+    "component_installer.py": "b15e33afda62fe42f9840ab3bb5bae9b672ba7685b40c8cbe9cade11a1813221",
+    "requirements.txt": "488ca5aaf8d0ac06e97713ac42eee481528de7c7e7e689f279071bf45bc354ea",
+    "start_mac.sh": "787e962681b806117e9278a041ebd8e077dcb1c5659de7789ac001c060d84f37",
+    "run_mac.command": "e8df83984c195953215b5d008194b14f234fb5132b7080bc1d3387f1221c7903",
+    "uninstall_cleanup.py": "47858ee28b83ce96ebf1f3f561cd340c7a28d89bcd1994e060c973be18619440",
+    "uninstall_mac.command": "93b9daabc564cc78c270fcb1370d2544407e4cae9c29e9f0881a88a8bd5accba",
+    "uninstall_windows.bat": "a5583bf87a209d06c89c60679ba11bf08478da96ed09eae36bc2fbbbcd6ba705",
+    "start_win.bat": "9243a6297fadf08f429ab0fd77e5f94377e575381289f30e02226bccea798c04",
+    "start_win.ps1": "ff695cd8790f06e29c632536eb61433586a32486bf068529a322901709f2fed6",
+    "docs/配布・環境構築ガイド.md": "e6af66e03670b238b66e90346011e0d5979e299f859aa88b62e2cc411d99ac0c",
+    "web/index.html": "b34e27d0290b75602e1ce56f0a7a7465ef888ca37d8da6238db2ead51accf8c0",
+    "web/iso-countries.json": "b86c7b2001f6ccac2fa222c3774fd14dda1179a2717c4d1fae9b795c0dc2f118",
+    "web/ISO_COUNTRIES_SOURCE.txt": "530a5473afc41769d9be138b0aba9c13a4fa6fc3838c8002cc6a59cab45de949",
+    "web/ISO_COUNTRIES_LICENSE.txt": "3fa39c6e18a3a4411082b64c164deae1d8f47b03a4d45304c1f0ae478626e382",
+    "辞書/インポート用サンプル.json": "a36a861a94723677eaefa05636fd3bfb6b4ff175603cdfdf9a8573d6d9c289fa"
+  },
+  "verification_notes": {
+    "mac": "Apple Siliconの開発Macで合成音声の文字起こし・整文を確認。未構築Macでの導入、実会場・長時間運用は未検証。",
+    "windows": "起動スクリプトの静的検査のみ。実機動作は未検証。"
+  }
+}

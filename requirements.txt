@@ -1,0 +1,12 @@
+# 模擬国連 議事録支援システム (MUN Minutes Assistant)
+# 本アプリケーションのサーバーは Python 3.9+ の標準ライブラリのみで動作します（外部 pip パッケージの依存なし）。
+
+# 必要外部ソフトウェア（システムに導入してください）:
+# 1. FFmpeg (音声16kHz変換用)
+#    - macOS: brew install ffmpeg
+#    - Windows: winget install Gyan.FFmpeg または https://ffmpeg.org
+# 2. whisper-cli (whisper.cpp 音声認識バイナリ)
+#    - macOS: brew install whisper-cpp
+#    - Windows: https://github.com/ggerganov/whisper.cpp/releases
+# 3. Ollama (ローカルLLM推論サービス)
+#    - https://ollama.com よりインストールし起動
